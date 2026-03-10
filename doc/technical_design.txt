@@ -160,6 +160,16 @@ This means:
 - the Next queue displays the same materials used by active pieces
 - the frame and panels use theme-defined persistent materials
 
+#### 7.1 Material rotation rule
+
+Material rotation is a presentation rule, not a gameplay rule.
+
+- `I`, `J`, `L`, `S`, `T`, and `Z` rotate their visual material together with the piece
+- `O` does not rotate its visual material
+- this applies even if the `O` material is not rotationally symmetric
+
+This rule is especially important for the noise theme. It keeps `O` visually stable while allowing other pieces to behave like rotated visual objects.
+
 This model applies equally to solid and noise themes.
 
 Examples:
@@ -451,6 +461,7 @@ It exists to bridge the gap between logic and rendering while remaining theme-ag
 Responsibilities include:
 
 - active piece display transform
+- active piece material rotation transform
 - entry motion state
 - lateral movement interpolation state
 - gravity display motion state
@@ -492,6 +503,11 @@ The renderer should support the following visual structure:
 - Next queue layer
 - line-clear temporary layer
 - shake transform applied at the appropriate visual scope
+
+Renderer requirements for piece materials:
+
+- non-`O` pieces apply piece rotation to their material when drawn
+- `O` keeps a fixed material orientation regardless of gameplay rotation state
 
 The renderer should allow theme switching without changing draw order or gameplay behavior.
 
