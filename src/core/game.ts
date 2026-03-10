@@ -485,6 +485,8 @@ function stepActiveState(state: GameState, input: InputFrame, previousInput: Inp
   const rotateCCWPressed = wasPressed(input.rotateCCW, previousInput.rotateCCW);
   const leftPressed = wasPressed(input.left, previousInput.left);
   const rightPressed = wasPressed(input.right, previousInput.right);
+  const upPressed = wasPressed(input.up, previousInput.up);
+  const downPressed = wasPressed(input.down, previousInput.down);
 
   let nextPiece = activePiece;
 
@@ -505,7 +507,7 @@ function stepActiveState(state: GameState, input: InputFrame, previousInput: Inp
     nextPiece = tryShiftPiece(nextPiece, state.field, state.inputMemory.dasDirection);
   }
 
-  if (input.up) {
+  if (upPressed) {
     const hardDropped = {
       ...nextPiece,
       y: findHardDropY(nextPiece, state.field),
@@ -514,7 +516,7 @@ function stepActiveState(state: GameState, input: InputFrame, previousInput: Inp
     return lockCurrentPiece(state, hardDropped);
   }
 
-  if (input.down && isGrounded(nextPiece, state.field)) {
+  if (downPressed && isGrounded(nextPiece, state.field)) {
     return lockCurrentPiece(state, { ...nextPiece, grounded: true });
   }
 

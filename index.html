@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noisetet Debug Client</title>
+    <style>
+      :root {
+        --bg: #11120d;
+        --bg-soft: #1a1d16;
+        --panel: #23271d;
+        --panel-line: #49523b;
+        --text: #eef1df;
+        --muted: #a9b09b;
+        --accent: #d4bb63;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top, rgba(212, 187, 99, 0.12), transparent 28%),
+          linear-gradient(160deg, #0d0e0a 0%, var(--bg) 45%, #171912 100%);
+        color: var(--text);
+        font-family: "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+
+      .shell {
+        width: min(980px, calc(100vw - 32px));
+        display: grid;
+        grid-template-columns: minmax(300px, 1fr) 240px;
+        gap: 20px;
+        padding: 24px;
+        border: 1px solid var(--panel-line);
+        background: linear-gradient(180deg, rgba(35, 39, 29, 0.92), rgba(20, 22, 17, 0.94));
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+      }
+
+      .play-area {
+        display: grid;
+        gap: 14px;
+      }
+
+      .title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: clamp(24px, 4vw, 34px);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      canvas {
+        width: 100%;
+        max-width: 420px;
+        border: 1px solid var(--panel-line);
+        background: #10130e;
+        image-rendering: pixelated;
+        justify-self: center;
+      }
+
+      .sidebar {
+        display: grid;
+        gap: 12px;
+        align-content: start;
+      }
+
+      .card {
+        padding: 14px;
+        border: 1px solid var(--panel-line);
+        background: rgba(16, 19, 14, 0.8);
+      }
+
+      .card h2 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--accent);
+      }
+
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 4px 0;
+        color: var(--muted);
+      }
+
+      .stat-row strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      .controls {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .controls strong {
+        color: var(--text);
+      }
+
+      @media (max-width: 800px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .shell {
+          padding: 16px;
+        }
+
+        .sidebar {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="play-area">
+        <div class="title-row">
+          <h1 class="title">Noisetet</h1>
+          <span class="subtitle">Solid Theme Debug Client</span>
+        </div>
+        <canvas id="game" width="420" height="560"></canvas>
+      </section>
+      <aside class="sidebar">
+        <section class="card">
+          <h2>State</h2>
+          <div id="stats"></div>
+        </section>
+        <section class="card">
+          <h2>Controls</h2>
+          <div class="controls">
+            <div><strong>Left / Right</strong> move</div>
+            <div><strong>Down</strong> soft drop / grounded lock</div>
+            <div><strong>Up</strong> hard drop + lock</div>
+            <div><strong>Z / X</strong> rotate CCW / CW</div>
+            <div><strong>R</strong> restart after game over</div>
+          </div>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>

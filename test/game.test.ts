@@ -322,6 +322,82 @@ describe("game state", () => {
     expect(state.activePiece?.rotation).toBe("right");
   });
 
+  it("does not defer hard drop from ARE into the spawned piece", () => {
+    let state = createInitialGameState({ seed: 7 });
+
+    for (let frame = 0; frame < state.config.timings.are - 1; frame += 1) {
+      state = stepGame(state, {
+        left: false,
+        right: false,
+        rotateCW: false,
+        rotateCCW: false,
+        up: true,
+        down: false,
+      });
+    }
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.phase).toBe("Spawning");
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.phase).toBe("Active");
+    expect(state.pieceCount).toBe(0);
+  });
+
+  it("does not defer grounded lock from ARE into the spawned piece", () => {
+    let state = createInitialGameState({ seed: 7 });
+
+    for (let frame = 0; frame < state.config.timings.are - 1; frame += 1) {
+      state = stepGame(state, {
+        left: false,
+        right: false,
+        rotateCW: false,
+        rotateCCW: false,
+        up: false,
+        down: true,
+      });
+    }
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: true,
+    });
+
+    expect(state.phase).toBe("Spawning");
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: true,
+    });
+
+    expect(state.phase).toBe("Active");
+    expect(state.pieceCount).toBe(0);
+  });
+
   it("allows a non-I piece to kick right when the base rotation is blocked off-center", () => {
     let state = advanceToActiveState();
     const field = createEmptyField();
