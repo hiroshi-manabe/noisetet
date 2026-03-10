@@ -2,6 +2,7 @@ import type {
   ActivePiece,
   CellOffset,
   Rotation,
+  RotationIntent,
   Tetromino,
 } from "./types.js";
 
@@ -196,12 +197,24 @@ export function getCellsForPiece(piece: ActivePiece): readonly CellOffset[] {
   return SHAPES[piece.type][piece.rotation];
 }
 
-export function rotateClockwise(rotation: Rotation): Rotation {
+function rotateClockwise(rotation: Rotation): Rotation {
   const index = ROTATIONS.indexOf(rotation);
   return ROTATIONS[(index + 1) % ROTATIONS.length];
 }
 
-export function rotateCounterclockwise(rotation: Rotation): Rotation {
+function rotateCounterclockwise(rotation: Rotation): Rotation {
   const index = ROTATIONS.indexOf(rotation);
   return ROTATIONS[(index + ROTATIONS.length - 1) % ROTATIONS.length];
+}
+
+export function rotatePiece(type: Tetromino, rotation: Rotation, direction: RotationIntent): Rotation {
+  if (type === "O") {
+    return "spawn";
+  }
+
+  if (type === "I" || type === "S" || type === "Z") {
+    return rotation === "spawn" || rotation === "reverse" ? "right" : "spawn";
+  }
+
+  return direction === "cw" ? rotateClockwise(rotation) : rotateCounterclockwise(rotation);
 }

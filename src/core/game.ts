@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from "./config.js";
-import { getCellsForPiece, rotateClockwise, rotateCounterclockwise } from "./pieces.js";
+import { getCellsForPiece, rotatePiece } from "./pieces.js";
 import { createRandomizerState, fillQueue, nextRandomPiece } from "./randomizer.js";
 import type {
   ActivePiece,
@@ -115,12 +115,16 @@ function updateInputMemory(state: GameState, input: InputFrame): InputMemory {
   } else if (rightPressed) {
     dasDirection = "right";
     dasChargeFrames = 0;
+  } else if (input.left && input.right) {
+    dasDirection =
+      previous.right && !previous.left ? "right" : previous.left && !previous.right ? "left" : dasDirection;
+    if (dasDirection !== null) {
+      dasChargeFrames += 1;
+    }
   } else if (input.left && !input.right && dasDirection === "left") {
     dasChargeFrames += 1;
   } else if (input.right && !input.left && dasDirection === "right") {
     dasChargeFrames += 1;
-  } else if (input.left && input.right) {
-    dasDirection = previous.right && !previous.left ? "right" : previous.left && !previous.right ? "left" : dasDirection;
   } else {
     dasDirection = null;
     dasChargeFrames = 0;
@@ -140,6 +144,10 @@ function updateInputMemory(state: GameState, input: InputFrame): InputMemory {
     dasChargeFrames,
     storedIrs,
   };
+}
+
+function wasPressed(current: boolean, previous: boolean): boolean {
+  return current && !previous;
 }
 
 function getAbsoluteCells(piece: ActivePiece): CellOffsetWithOccupancy[] {
@@ -172,17 +180,88 @@ function isGrounded(piece: ActivePiece, field: Field): boolean {
   return !canPlace(shifted, field);
 }
 
+function firstCollisionLocalCell(piece: ActivePiece, field: Field): CellOffsetWithOccupancy | null {
+  const width = field[0]?.length ?? 0;
+  const height = field.length;
+
+  const occupiedCells = getCellsForPiece(piece)
+    .map((cell) => ({ ...cell }))
+    .sort((left, right) => left.y - right.y || left.x - right.x);
+
+  for (const cell of occupiedCells) {
+    const x = piece.x + cell.x;
+    const y = piece.y + cell.y;
+    if (x < 0 || x >= width || y < 0 || y >= height || field[y][x] !== null) {
+      return cell;
+    }
+  }
+
+  return null;
+}
+
+function isCenterColumnKickBlocked(currentPiece: ActivePiece, rotatedPiece: ActivePiece, field: Field): boolean {
+  if (!["T", "J", "L"].includes(currentPiece.type)) {
+    return false;
+  }
+
+  if (!["spawn", "reverse"].includes(currentPiece.rotation)) {
+    return false;
+  }
+
+  const collision = firstCollisionLocalCell(rotatedPiece, field);
+  return collision?.x === 1;
+}
+
+function tryRotatePiece(
+  piece: ActivePiece,
+  field: Field,
+  direction: RotationIntent,
+): ActivePiece {
+  const rotated: ActivePiece = {
+    ...piece,
+    rotation: rotatePiece(piece.type, piece.rotation, direction),
+  };
+
+  if (canPlace(rotated, field)) {
+    return rotated;
+  }
+
+  if (piece.type === "I") {
+    return piece;
+  }
+
+  if (isCenterColumnKickBlocked(piece, rotated, field)) {
+    return piece;
+  }
+
+  const kickRight = { ...rotated, x: rotated.x + 1 };
+  if (canPlace(kickRight, field)) {
+    return kickRight;
+  }
+
+  const kickLeft = { ...rotated, x: rotated.x - 1 };
+  if (canPlace(kickLeft, field)) {
+    return kickLeft;
+  }
+
+  return piece;
+}
+
+function tryShiftPiece(piece: ActivePiece, field: Field, direction: HorizontalDirection): ActivePiece {
+  const shifted: ActivePiece = {
+    ...piece,
+    x: piece.x + (direction === "left" ? -1 : 1),
+  };
+
+  return canPlace(shifted, field) ? shifted : piece;
+}
+
 function applyStoredIrs(piece: ActivePiece, intent: RotationIntent | null, field: Field): ActivePiece {
   if (intent === null) {
     return piece;
   }
 
-  const rotated: ActivePiece = {
-    ...piece,
-    rotation: intent === "cw" ? rotateClockwise(piece.rotation) : rotateCounterclockwise(piece.rotation),
-  };
-
-  return canPlace(rotated, field) ? rotated : piece;
+  return tryRotatePiece(piece, field, intent);
 }
 
 function applySpawnLateralIntent(
@@ -396,30 +475,54 @@ function stepSpawningState(state: GameState): GameState {
   };
 }
 
-function stepActiveState(state: GameState, input: InputFrame): GameState {
+function stepActiveState(state: GameState, input: InputFrame, previousInput: InputFrame): GameState {
   const activePiece = state.activePiece;
   if (activePiece === null) {
     return state;
   }
 
+  const rotateCWPressed = wasPressed(input.rotateCW, previousInput.rotateCW);
+  const rotateCCWPressed = wasPressed(input.rotateCCW, previousInput.rotateCCW);
+  const leftPressed = wasPressed(input.left, previousInput.left);
+  const rightPressed = wasPressed(input.right, previousInput.right);
+
+  let nextPiece = activePiece;
+
+  if (rotateCWPressed) {
+    nextPiece = tryRotatePiece(nextPiece, state.field, "cw");
+  } else if (rotateCCWPressed) {
+    nextPiece = tryRotatePiece(nextPiece, state.field, "ccw");
+  }
+
+  if (leftPressed) {
+    nextPiece = tryShiftPiece(nextPiece, state.field, "left");
+  } else if (rightPressed) {
+    nextPiece = tryShiftPiece(nextPiece, state.field, "right");
+  } else if (
+    state.inputMemory.dasDirection !== null &&
+    state.inputMemory.dasChargeFrames >= state.config.timings.das
+  ) {
+    nextPiece = tryShiftPiece(nextPiece, state.field, state.inputMemory.dasDirection);
+  }
+
   if (input.up) {
     const hardDropped = {
-      ...activePiece,
-      y: findHardDropY(activePiece, state.field),
+      ...nextPiece,
+      y: findHardDropY(nextPiece, state.field),
       grounded: true,
     };
     return lockCurrentPiece(state, hardDropped);
   }
 
-  if (input.down && isGrounded(activePiece, state.field)) {
-    return lockCurrentPiece(state, { ...activePiece, grounded: true });
+  if (input.down && isGrounded(nextPiece, state.field)) {
+    return lockCurrentPiece(state, { ...nextPiece, grounded: true });
   }
 
   const effectiveGravity = input.down
     ? Math.max(state.gravityInternal, state.config.softDropInternalGravity)
     : state.gravityInternal;
-  const gravityResult = applyGravity(activePiece, state.field, effectiveGravity);
-  let nextPiece = gravityResult.piece;
+  const gravityResult = applyGravity(nextPiece, state.field, effectiveGravity);
+  nextPiece = gravityResult.piece;
   const groundedBefore = activePiece.grounded;
   const groundedAfter = isGrounded(nextPiece, state.field);
 
@@ -478,9 +581,11 @@ function stepLineClearState(state: GameState): GameState {
 }
 
 export function stepGame(state: GameState, input: InputFrame = EMPTY_INPUT): GameState {
+  const previousInput = state.inputMemory.previousInput;
+  const nextInputMemory = updateInputMemory(state, input);
   const nextState: GameState = {
     ...state,
-    inputMemory: updateInputMemory(state, input),
+    inputMemory: nextInputMemory,
   };
 
   switch (state.phase) {
@@ -489,7 +594,7 @@ export function stepGame(state: GameState, input: InputFrame = EMPTY_INPUT): Gam
     case "Spawning":
       return stepSpawningState(nextState);
     case "Active":
-      return stepActiveState(nextState, input);
+      return stepActiveState(nextState, input, previousInput);
     case "LineClear":
       return stepLineClearState(nextState);
     case "GameOver":
