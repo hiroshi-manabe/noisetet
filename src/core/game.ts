@@ -1,0 +1,500 @@
+import { DEFAULT_CONFIG } from "./config.js";
+import { getCellsForPiece, rotateClockwise, rotateCounterclockwise } from "./pieces.js";
+import { createRandomizerState, fillQueue, nextRandomPiece } from "./randomizer.js";
+import type {
+  ActivePiece,
+  Field,
+  FieldCell,
+  GameConfig,
+  GameState,
+  HorizontalDirection,
+  InputFrame,
+  InputMemory,
+  RotationIntent,
+  Tetromino,
+} from "./types.js";
+
+export const EMPTY_INPUT: InputFrame = {
+  left: false,
+  right: false,
+  rotateCW: false,
+  rotateCCW: false,
+  up: false,
+  down: false,
+};
+
+const SPAWN_X: Record<Tetromino, number> = {
+  I: 3,
+  O: 4,
+  T: 3,
+  S: 3,
+  Z: 3,
+  J: 3,
+  L: 3,
+};
+
+function createInputMemory(): InputMemory {
+  return {
+    previousInput: EMPTY_INPUT,
+    dasDirection: null,
+    dasChargeFrames: 0,
+    storedIrs: null,
+  };
+}
+
+export function createEmptyField(
+  width = DEFAULT_CONFIG.fieldWidth,
+  height = DEFAULT_CONFIG.fieldHeight,
+): Field {
+  return Array.from({ length: height }, () => Array<FieldCell>(width).fill(null));
+}
+
+function cloneField(field: Field): Field {
+  return field.map((row) => [...row]);
+}
+
+function resolveGravityInternal(pieceCount: number, config: GameConfig): number {
+  let gravity = config.gravityLadder[0].internalGravity;
+
+  for (const tier of config.gravityLadder) {
+    if (pieceCount >= tier.minLockedPieces) {
+      gravity = tier.internalGravity;
+    }
+  }
+
+  return gravity;
+}
+
+export function createInitialGameState(options?: {
+  seed?: number;
+  config?: GameConfig;
+  field?: Field;
+}): GameState {
+  const config = options?.config ?? DEFAULT_CONFIG;
+  const initialField = options?.field ? cloneField(options.field) : createEmptyField(config.fieldWidth, config.fieldHeight);
+  const randomizer = createRandomizerState(options?.seed ?? 1);
+  const queueFill = fillQueue(randomizer, config.queueLength);
+
+  return {
+    phase: "ARE",
+    field: initialField,
+    queue: queueFill.pieces,
+    randomizer: queueFill.state,
+    activePiece: null,
+    pieceCount: 0,
+    gravityInternal: resolveGravityInternal(0, config),
+    inputMemory: createInputMemory(),
+    areFramesRemaining: config.timings.are,
+    lineClearFramesRemaining: 0,
+    pendingClearedRows: [],
+    config,
+  };
+}
+
+export function getGravityInternalForPieceCount(
+  pieceCount: number,
+  config = DEFAULT_CONFIG,
+): number {
+  return resolveGravityInternal(pieceCount, config);
+}
+
+function updateInputMemory(state: GameState, input: InputFrame): InputMemory {
+  const previous = state.inputMemory.previousInput;
+  const leftPressed = input.left && !previous.left;
+  const rightPressed = input.right && !previous.right;
+  const rotateCWPressed = input.rotateCW && !previous.rotateCW;
+  const rotateCCWPressed = input.rotateCCW && !previous.rotateCCW;
+
+  let dasDirection: HorizontalDirection | null = state.inputMemory.dasDirection;
+  let dasChargeFrames = state.inputMemory.dasChargeFrames;
+  let storedIrs: RotationIntent | null = state.inputMemory.storedIrs;
+
+  if (leftPressed) {
+    dasDirection = "left";
+    dasChargeFrames = 0;
+  } else if (rightPressed) {
+    dasDirection = "right";
+    dasChargeFrames = 0;
+  } else if (input.left && !input.right && dasDirection === "left") {
+    dasChargeFrames += 1;
+  } else if (input.right && !input.left && dasDirection === "right") {
+    dasChargeFrames += 1;
+  } else if (input.left && input.right) {
+    dasDirection = previous.right && !previous.left ? "right" : previous.left && !previous.right ? "left" : dasDirection;
+  } else {
+    dasDirection = null;
+    dasChargeFrames = 0;
+  }
+
+  if (state.phase === "ARE" || state.phase === "LineClear") {
+    if (rotateCWPressed) {
+      storedIrs = "cw";
+    } else if (rotateCCWPressed) {
+      storedIrs = "ccw";
+    }
+  }
+
+  return {
+    previousInput: input,
+    dasDirection,
+    dasChargeFrames,
+    storedIrs,
+  };
+}
+
+function getAbsoluteCells(piece: ActivePiece): CellOffsetWithOccupancy[] {
+  return getCellsForPiece(piece).map((cell) => ({
+    x: piece.x + cell.x,
+    y: piece.y + cell.y,
+  }));
+}
+
+interface CellOffsetWithOccupancy {
+  x: number;
+  y: number;
+}
+
+function canPlace(piece: ActivePiece, field: Field): boolean {
+  const width = field[0]?.length ?? 0;
+  const height = field.length;
+
+  return getAbsoluteCells(piece).every((cell) => {
+    if (cell.x < 0 || cell.x >= width || cell.y < 0 || cell.y >= height) {
+      return false;
+    }
+
+    return field[cell.y][cell.x] === null;
+  });
+}
+
+function isGrounded(piece: ActivePiece, field: Field): boolean {
+  const shifted: ActivePiece = { ...piece, y: piece.y + 1 };
+  return !canPlace(shifted, field);
+}
+
+function applyStoredIrs(piece: ActivePiece, intent: RotationIntent | null, field: Field): ActivePiece {
+  if (intent === null) {
+    return piece;
+  }
+
+  const rotated: ActivePiece = {
+    ...piece,
+    rotation: intent === "cw" ? rotateClockwise(piece.rotation) : rotateCounterclockwise(piece.rotation),
+  };
+
+  return canPlace(rotated, field) ? rotated : piece;
+}
+
+function applySpawnLateralIntent(
+  piece: ActivePiece,
+  direction: HorizontalDirection | null,
+  field: Field,
+): ActivePiece {
+  if (direction === null) {
+    return piece;
+  }
+
+  const shifted: ActivePiece = {
+    ...piece,
+    x: piece.x + (direction === "left" ? -1 : 1),
+  };
+
+  return canPlace(shifted, field) ? shifted : piece;
+}
+
+function createSpawnPiece(type: Tetromino, config: GameConfig): ActivePiece {
+  return {
+    type,
+    rotation: "spawn",
+    x: SPAWN_X[type],
+    y: 0,
+    gravityAccumulator: 0,
+    grounded: false,
+    lockDelayRemaining: config.timings.lockDelay,
+  };
+}
+
+function fillQueueToLength(
+  queue: Tetromino[],
+  randomizer: GameState["randomizer"],
+  length: number,
+): { queue: Tetromino[]; randomizer: GameState["randomizer"] } {
+  let nextQueue = [...queue];
+  let nextRandomizer = randomizer;
+
+  while (nextQueue.length < length) {
+    const draw = nextRandomPiece(nextRandomizer);
+    nextQueue.push(draw.piece);
+    nextRandomizer = draw.state;
+  }
+
+  return { queue: nextQueue, randomizer: nextRandomizer };
+}
+
+function findHardDropY(piece: ActivePiece, field: Field): number {
+  let current = piece;
+
+  while (canPlace({ ...current, y: current.y + 1 }, field)) {
+    current = { ...current, y: current.y + 1 };
+  }
+
+  return current.y;
+}
+
+function mergePieceIntoField(field: Field, piece: ActivePiece): Field {
+  const nextField = cloneField(field);
+
+  for (const cell of getAbsoluteCells(piece)) {
+    nextField[cell.y][cell.x] = piece.type;
+  }
+
+  return nextField;
+}
+
+function detectClearedRows(field: Field): number[] {
+  const clearedRows: number[] = [];
+
+  for (let y = 0; y < field.length; y += 1) {
+    if (field[y].every((cell) => cell !== null)) {
+      clearedRows.push(y);
+    }
+  }
+
+  return clearedRows;
+}
+
+function collapseField(field: Field, clearedRows: number[]): Field {
+  if (clearedRows.length === 0) {
+    return cloneField(field);
+  }
+
+  const remainingRows = field.filter((_, index) => !clearedRows.includes(index));
+  const emptyRows = Array.from({ length: clearedRows.length }, () =>
+    Array<FieldCell>(field[0].length).fill(null),
+  );
+
+  return [...emptyRows, ...remainingRows];
+}
+
+function applyGravity(
+  piece: ActivePiece,
+  field: Field,
+  internalGravity: number,
+): { piece: ActivePiece; rowsMoved: number } {
+  if (internalGravity >= 5120) {
+    const hardSettledY = findHardDropY(piece, field);
+    return {
+      piece: { ...piece, y: hardSettledY, gravityAccumulator: 0 },
+      rowsMoved: hardSettledY - piece.y,
+    };
+  }
+
+  let nextPiece = { ...piece };
+  let rowsMoved = 0;
+  let gravityAccumulator = piece.gravityAccumulator + internalGravity;
+
+  while (gravityAccumulator >= 256) {
+    const candidate = { ...nextPiece, y: nextPiece.y + 1 };
+    if (!canPlace(candidate, field)) {
+      break;
+    }
+
+    nextPiece = candidate;
+    rowsMoved += 1;
+    gravityAccumulator -= 256;
+  }
+
+  nextPiece.gravityAccumulator = gravityAccumulator;
+  return { piece: nextPiece, rowsMoved };
+}
+
+function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
+  const lockedField = mergePieceIntoField(state.field, piece);
+  const pendingClearedRows = detectClearedRows(lockedField);
+  const nextPieceCount = state.pieceCount + 1;
+
+  if (pendingClearedRows.length > 0) {
+    return {
+      ...state,
+      phase: "LineClear",
+      field: lockedField,
+      activePiece: null,
+      pieceCount: nextPieceCount,
+      gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
+      lineClearFramesRemaining: state.config.timings.lineClearDelay,
+      pendingClearedRows,
+    };
+  }
+
+  return {
+    ...state,
+    phase: "ARE",
+    field: lockedField,
+    activePiece: null,
+    pieceCount: nextPieceCount,
+    gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
+    areFramesRemaining: state.config.timings.are,
+    pendingClearedRows: [],
+    lineClearFramesRemaining: 0,
+  };
+}
+
+function stepAreState(state: GameState): GameState {
+  const nextAre = Math.max(0, state.areFramesRemaining - 1);
+
+  if (nextAre === 0) {
+    return {
+      ...state,
+      phase: "Spawning",
+      areFramesRemaining: 0,
+    };
+  }
+
+  return {
+    ...state,
+    areFramesRemaining: nextAre,
+  };
+}
+
+function stepSpawningState(state: GameState): GameState {
+  const [nextType, ...remainingQueue] = state.queue;
+  if (nextType === undefined) {
+    throw new Error("Queue underflow during spawn.");
+  }
+
+  const refilled = fillQueueToLength(remainingQueue, state.randomizer, state.config.queueLength);
+  let piece = createSpawnPiece(nextType, state.config);
+  piece = applyStoredIrs(piece, state.inputMemory.storedIrs, state.field);
+  piece = applySpawnLateralIntent(piece, state.inputMemory.dasDirection, state.field);
+
+  if (!canPlace(piece, state.field)) {
+    return {
+      ...state,
+      phase: "GameOver",
+      queue: refilled.queue,
+      randomizer: refilled.randomizer,
+      inputMemory: {
+        ...state.inputMemory,
+        storedIrs: null,
+      },
+    };
+  }
+
+  return {
+    ...state,
+    phase: "Active",
+    queue: refilled.queue,
+    randomizer: refilled.randomizer,
+    activePiece: {
+      ...piece,
+      grounded: isGrounded(piece, state.field),
+    },
+    inputMemory: {
+      ...state.inputMemory,
+      storedIrs: null,
+    },
+  };
+}
+
+function stepActiveState(state: GameState, input: InputFrame): GameState {
+  const activePiece = state.activePiece;
+  if (activePiece === null) {
+    return state;
+  }
+
+  if (input.up) {
+    const hardDropped = {
+      ...activePiece,
+      y: findHardDropY(activePiece, state.field),
+      grounded: true,
+    };
+    return lockCurrentPiece(state, hardDropped);
+  }
+
+  if (input.down && isGrounded(activePiece, state.field)) {
+    return lockCurrentPiece(state, { ...activePiece, grounded: true });
+  }
+
+  const effectiveGravity = input.down
+    ? Math.max(state.gravityInternal, state.config.softDropInternalGravity)
+    : state.gravityInternal;
+  const gravityResult = applyGravity(activePiece, state.field, effectiveGravity);
+  let nextPiece = gravityResult.piece;
+  const groundedBefore = activePiece.grounded;
+  const groundedAfter = isGrounded(nextPiece, state.field);
+
+  if (gravityResult.rowsMoved > 0) {
+    nextPiece = {
+      ...nextPiece,
+      grounded: groundedAfter,
+      lockDelayRemaining: state.config.timings.lockDelay,
+    };
+  } else if (groundedAfter && !groundedBefore) {
+    nextPiece = {
+      ...nextPiece,
+      grounded: true,
+      lockDelayRemaining: state.config.timings.lockDelay,
+    };
+  } else if (groundedAfter && groundedBefore) {
+    nextPiece = {
+      ...nextPiece,
+      grounded: true,
+      lockDelayRemaining: nextPiece.lockDelayRemaining - 1,
+    };
+  } else {
+    nextPiece = {
+      ...nextPiece,
+      grounded: false,
+    };
+  }
+
+  if (nextPiece.grounded && nextPiece.lockDelayRemaining <= 0) {
+    return lockCurrentPiece(state, nextPiece);
+  }
+
+  return {
+    ...state,
+    activePiece: nextPiece,
+  };
+}
+
+function stepLineClearState(state: GameState): GameState {
+  const nextDelay = Math.max(0, state.lineClearFramesRemaining - 1);
+  if (nextDelay > 0) {
+    return {
+      ...state,
+      lineClearFramesRemaining: nextDelay,
+    };
+  }
+
+  return {
+    ...state,
+    phase: "ARE",
+    field: collapseField(state.field, state.pendingClearedRows),
+    pendingClearedRows: [],
+    lineClearFramesRemaining: 0,
+    areFramesRemaining: state.config.timings.lineAre,
+  };
+}
+
+export function stepGame(state: GameState, input: InputFrame = EMPTY_INPUT): GameState {
+  const nextState: GameState = {
+    ...state,
+    inputMemory: updateInputMemory(state, input),
+  };
+
+  switch (state.phase) {
+    case "ARE":
+      return stepAreState(nextState);
+    case "Spawning":
+      return stepSpawningState(nextState);
+    case "Active":
+      return stepActiveState(nextState, input);
+    case "LineClear":
+      return stepLineClearState(nextState);
+    case "GameOver":
+      return nextState;
+    default:
+      return nextState;
+  }
+}
