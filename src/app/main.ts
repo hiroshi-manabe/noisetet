@@ -53,7 +53,7 @@ let accumulator = 0;
 let previousTime = performance.now();
 
 window.addEventListener("keydown", (event) => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX"].includes(event.code)) {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC"].includes(event.code)) {
     event.preventDefault();
   }
 
@@ -73,7 +73,7 @@ function buildInputFrame(): InputFrame {
     left: pressedKeys.has("ArrowLeft"),
     right: pressedKeys.has("ArrowRight"),
     rotateCW: pressedKeys.has("KeyX"),
-    rotateCCW: pressedKeys.has("KeyZ"),
+    rotateCCW: pressedKeys.has("KeyZ") || pressedKeys.has("KeyC"),
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
   };

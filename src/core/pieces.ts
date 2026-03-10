@@ -63,10 +63,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
   },
   T: {
     spawn: [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
+      { x: 0, y: 1 },
       { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 1, y: 2 },
     ],
     right: [
       { x: 1, y: 0 },
@@ -75,24 +75,24 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
       { x: 1, y: 2 },
     ],
     reverse: [
-      { x: 1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 1, y: 1 },
-      { x: 2, y: 1 },
-    ],
-    left: [
-      { x: 0, y: 0 },
-      { x: 0, y: 1 },
       { x: 1, y: 1 },
       { x: 0, y: 2 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
+    ],
+    left: [
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 1, y: 2 },
     ],
   },
   S: {
     spawn: [
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
-      { x: 0, y: 1 },
       { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 0, y: 2 },
+      { x: 1, y: 2 },
     ],
     right: [
       { x: 0, y: 0 },
@@ -101,10 +101,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
       { x: 1, y: 2 },
     ],
     reverse: [
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
-      { x: 0, y: 1 },
       { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 0, y: 2 },
+      { x: 1, y: 2 },
     ],
     left: [
       { x: 0, y: 0 },
@@ -115,10 +115,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
   },
   Z: {
     spawn: [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
+      { x: 0, y: 1 },
       { x: 1, y: 1 },
-      { x: 2, y: 1 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
     ],
     right: [
       { x: 1, y: 0 },
@@ -127,10 +127,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
       { x: 0, y: 2 },
     ],
     reverse: [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
+      { x: 0, y: 1 },
       { x: 1, y: 1 },
-      { x: 2, y: 1 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
     ],
     left: [
       { x: 1, y: 0 },
@@ -141,10 +141,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
   },
   J: {
     spawn: [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
       { x: 2, y: 1 },
+      { x: 2, y: 2 },
     ],
     right: [
       { x: 1, y: 0 },
@@ -153,10 +153,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
       { x: 1, y: 2 },
     ],
     reverse: [
-      { x: 0, y: 0 },
       { x: 0, y: 1 },
-      { x: 1, y: 1 },
-      { x: 2, y: 1 },
+      { x: 0, y: 2 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
     ],
     left: [
       { x: 0, y: 0 },
@@ -167,10 +167,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
   },
   L: {
     spawn: [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 2, y: 0 },
       { x: 0, y: 1 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 0, y: 2 },
     ],
     right: [
       { x: 0, y: 0 },
@@ -179,10 +179,10 @@ const SHAPES: Record<Tetromino, Record<Rotation, readonly CellOffset[]>> = {
       { x: 1, y: 2 },
     ],
     reverse: [
-      { x: 2, y: 0 },
-      { x: 0, y: 1 },
-      { x: 1, y: 1 },
       { x: 2, y: 1 },
+      { x: 0, y: 2 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
     ],
     left: [
       { x: 0, y: 0 },

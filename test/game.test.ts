@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createEmptyField,
   createInitialGameState,
+  getCellsForPiece,
   getGravityInternalForPieceCount,
   stepGame,
 } from "../src/core/index.js";
@@ -223,6 +224,71 @@ describe("game state", () => {
     });
 
     expect(state.activePiece?.rotation).toBe("right");
+  });
+
+  it("keeps the bottom boundary fixed when T rotates on flat ground", () => {
+    let state = advanceToActiveState();
+
+    state = {
+      ...state,
+      gravityInternal: 0,
+      activePiece: {
+        type: "T",
+        rotation: "spawn",
+        x: 3,
+        y: 18,
+        gravityAccumulator: 0,
+        grounded: true,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: true,
+      rotateCCW: false,
+      up: false,
+      down: false,
+    });
+
+    expect(state.activePiece?.rotation).toBe("right");
+    expect(state.activePiece?.y).toBe(18);
+    expect(state.activePiece?.grounded).toBe(true);
+  });
+
+  it("uses a left-right symmetric T rotation state for CCW", () => {
+    let state = advanceToActiveState();
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "T",
+        rotation: "spawn",
+        x: 3,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: true,
+      up: false,
+      down: false,
+    });
+
+    expect(state.activePiece?.rotation).toBe("left");
+    expect(getCellsForPiece(state.activePiece!)).toEqual([
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 1, y: 2 },
+    ]);
   });
 
   it("keeps O rotation as a no-op", () => {
