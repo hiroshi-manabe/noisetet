@@ -1,0 +1,613 @@
+# White-Noise Falling-Block Game
+## Technical Design Document v0.1
+
+### 1. Purpose
+
+This document describes the technical design of a falling-block game whose gameplay foundation is a TAP/TGM2-ARS-inspired implementation, and whose artistic identity is the white-noise theme.
+
+The central design requirement is a deliberate duality:
+
+- In implementation terms, **solid mode** and **noise mode** must differ only by theme materials and not by gameplay logic.
+- In experiential terms, the **white-noise theme** is the defining identity of the project.
+
+The engine must therefore be built as one coherent gameplay system with one coherent motion/presentation model, while allowing the white-noise theme to transform the player's perception of that system.
+
+---
+
+### 2. Project Principle
+
+The most important principle of the project is this:
+
+**Noise mode is architecturally small, but conceptually central.**
+
+That means:
+
+- The game must not be implemented as a normal game plus a special-case noise variant.
+- The game must not be documented as though noise were an afterthought.
+- The correct architecture is one engine, one motion model, one rendering model, and multiple themes.
+- The white-noise theme is the artistic center even though it should be a minor switch at the code level.
+
+This principle should influence all technical decisions.
+
+---
+
+### 3. Gameplay Baseline
+
+The gameplay baseline is:
+
+- TAP / TGM2-style ARS
+- 3 Next previews
+- no Hold
+- no T-Spin handling
+- Up = hard drop + immediate lock (custom deviation)
+- Down = TAP/TGM2-style soft drop behavior (no extra custom lock rule)
+- line clear animation and lock shake are custom presentation behaviors
+
+The project is not trying to reproduce every historical detail exactly, but it is trying to stay disciplined and reference-driven rather than drifting into generic "Tetris-like" behavior.
+
+---
+
+### 4. System Overview
+
+The project should be divided into the following high-level systems:
+
+1. **Gameplay Core**
+   - Pure rules and state transitions
+   - No knowledge of textures, noise, or colors
+
+2. **Presentation State**
+   - Shared motion and animation model
+   - Active piece movement, entry motion, queue motion, lock shake, line clear motion
+   - Common across solid and noise themes
+
+3. **Theme / Material System**
+   - Supplies visual materials for all roles
+   - Determines whether the game appears in solid mode or noise mode
+
+4. **Renderer**
+   - Draws gameplay state using presentation state and theme materials
+   - Same rendering structure for all themes
+
+This separation is mandatory. Theme differences must never leak into gameplay logic.
+
+---
+
+### 5. Core Architectural View
+
+The game should not be conceptualized as drawing symbolic blocks directly from logical occupancy every frame.
+
+Instead, the correct visual model is:
+
+- the **active piece** is a movable visual layer with a persistent material
+- the **settled field** is a composited surface
+- **locking** commits the active piece into the settled field surface
+- the **Next queue** displays persistent materials and animates them within its own panel
+- the **frame**, **background**, and **panels** are also persistent visual roles owned by the theme
+
+This visual model must be shared by both solid mode and noise mode.
+
+In other words, the difference between the two modes is not in how the game is drawn, but only in what materials are assigned to the visual roles.
+
+---
+
+### 6. Theme System
+
+#### 6.1 Theme abstraction
+
+A theme is a complete assignment of materials to visual roles.
+
+Visual roles include at minimum:
+
+- background
+- frame
+- playfield surface
+- Next panel background
+- each tetromino type
+- cleared-line presentation layer
+- optional UI text and accents
+
+Each role owns a persistent material.
+
+#### 6.2 Solid theme
+
+In solid mode:
+
+- tetromino materials may be flat colors or simple visible textures
+- the frame and background may be plain and readable
+- visibility is intentionally high
+
+Solid mode exists primarily for development, tuning, debugging, and gameplay validation.
+
+#### 6.3 Noise theme
+
+In noise mode:
+
+- all major visible elements use fixed white-noise materials
+- the noise must be pre-generated and persistent
+- the frame and Next area must also be white-noise-based, not normal readable widgets
+- the player should rely on motion and change rather than static contrast
+
+Noise mode is the artistic identity of the project.
+
+#### 6.4 Theme invariants
+
+Switching themes must not alter:
+
+- piece rules
+- spawn rules
+- randomizer
+- timings
+- movement behavior
+- lock behavior
+- queue behavior
+- animation behavior
+- state transitions
+
+If gameplay changes when the theme changes, the architecture has failed.
+
+---
+
+### 7. Material Model
+
+The project should treat materials as persistent assets attached to roles rather than one-frame drawing instructions.
+
+This means:
+
+- each tetromino type has a persistent material
+- an active piece instance is a transform applied to its type material
+- the settled field is a composited accumulation of prior piece materials
+- the Next queue displays the same materials used by active pieces
+- the frame and panels use theme-defined persistent materials
+
+This model applies equally to solid and noise themes.
+
+Examples:
+
+- in solid mode, the T piece material might simply be a magenta fill
+- in noise mode, the T piece material might be a fixed white-noise image
+
+But in both modes, it is still the same role in the same pipeline.
+
+---
+
+### 8. Gameplay Core
+
+The gameplay core should contain only deterministic game logic.
+
+Responsibilities:
+
+- field occupancy
+- active piece state
+- queue state
+- spawn and game-over checks
+- gravity
+- lock delay
+- movement validity
+- rotation validity
+- grounded detection
+- line clear detection
+- ARE and other transition states
+- scoring if later added
+
+The gameplay core must not know whether the piece is drawn as a colored shape or as white noise.
+
+#### 8.1 Rules reference
+
+The gameplay core should follow a TAP/TGM2-inspired baseline with explicit defaults:
+
+- ARS (not World/SRS)
+- no Hold
+- no T-Spin logic
+- step-reset-only lock behavior
+- one-row buffer zone above the visible 20-row field (effective logical height 21)
+- deterministic frame-based timing at 60 fps
+
+#### 8.2 ARS behavior requirements (TAP-style)
+
+- spawn in the upper rows used by ARS/TAP (piece appears high, not guideline-style low spawn)
+- L/J/T initial orientation follows ARS (initial flat side facing up)
+- I/S/Z functionally use two orientations in play
+- kick order for non-I pieces: base rotation -> +1 right -> +1 left
+- I piece does not wall-kick in TAP-style ARS
+- L/J/T center-column constraint must be respected (no generic SRS kick table)
+- no world-rule floor-kick behavior
+
+#### 8.3 Randomizer requirements (TGM2/TAP)
+
+- use TGM history randomizer
+- history size = 4
+- reroll attempts per piece = 6
+- first piece may not be S, Z, or O
+- initial history seed is TAP-style (`Z, Z, S, S` behavior)
+
+#### 8.4 Deliberate deviations from original TAP
+
+- preview count is `3` (TAP arcade baseline is `1`)
+- `Up` is hard drop with immediate lock (TAP sonic drop does not lock)
+
+No other gameplay-rule deviations from TAP/TGM2 should be introduced without an explicit design update.
+
+---
+
+### 9. Input System
+
+The input system should be designed around frame-based evaluation with support for buffered and preloaded actions.
+
+Responsibilities:
+
+- current button state
+- pressed-this-frame transitions
+- DAS charging and repeat behavior
+- rotation input handling
+- hard drop input
+- soft drop input
+- pre-entry lateral input intent
+- optional spawn-time rotation intent if later desired
+
+A key project requirement is that player intention can exist before the next piece becomes active.
+
+If Left or Right is already being held during entry delay, the next piece should enter according to that stored horizontal intent rather than appearing as a neutral centered object and moving only afterward.
+
+This behavior is important for two reasons:
+
+- it supports the TGM-family feel
+- it strengthens the noise concept by giving the new piece motion at the moment of entry
+
+---
+
+### 10. Timing and Simulation
+
+The simulation should run at a fixed 60 fps.
+
+All timing-sensitive behavior should be frame-based and configurable.
+
+At minimum, the configuration system should support parameters for:
+
+- gravity
+- soft drop speed
+- lock delay
+- ARE
+- line clear delay
+- DAS
+- repeat interval / ARR equivalent if needed
+- entry animation duration
+- lateral movement animation duration
+- queue slide duration
+- line clear slide duration
+- lock shake duration
+- lock shake amplitude
+
+Even if early versions use provisional values, the architecture should assume these values are tunable data.
+
+#### 10.1 Default timing profile (TAP Master reference)
+
+The default profile should be Master-mode-like TAP timing, then adjusted only where this project explicitly diverges.
+
+Internal gravity table (`G = internal / 256`):
+
+| Level range | Internal gravity | Approx gravity |
+| --- | ---: | ---: |
+| 0-29 | 4 | 0.015625G |
+| 30-34 | 6 | 0.0234375G |
+| 35-39 | 8 | 0.03125G |
+| 40-49 | 10 | 0.0390625G |
+| 50-59 | 12 | 0.046875G |
+| 60-69 | 16 | 0.0625G |
+| 70-79 | 32 | 0.125G |
+| 80-89 | 48 | 0.1875G |
+| 90-99 | 64 | 0.25G |
+| 100-119 | 80 | 0.3125G |
+| 120-139 | 96 | 0.375G |
+| 140-159 | 112 | 0.4375G |
+| 160-169 | 128 | 0.5G |
+| 170-199 | 144 | 0.5625G |
+| 200-219 | 4 | 0.015625G |
+| 220-229 | 32 | 0.125G |
+| 230-232 | 64 | 0.25G |
+| 233-235 | 96 | 0.375G |
+| 236-238 | 128 | 0.5G |
+| 239-242 | 160 | 0.625G |
+| 243-246 | 192 | 0.75G |
+| 247-250 | 224 | 0.875G |
+| 251-299 | 256 | 1G |
+| 300-329 | 512 | 2G |
+| 330-359 | 768 | 3G |
+| 360-399 | 1024 | 4G |
+| 400-419 | 1280 | 5G |
+| 420-449 | 1024 | 4G |
+| 450-499 | 768 | 3G |
+| 500+ | 5120 | 20G |
+
+Master delay table (frames):
+
+| Level range | ARE | Line ARE | DAS | Lock | Line clear |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0-499 | 27 | 27 | 16 | 30 | 40 |
+| 500-600 | 27 | 27 | 10 | 30 | 25 |
+| 601-700 | 27 | 18 | 10 | 30 | 16 |
+| 701-800 | 18 | 14 | 10 | 30 | 12 |
+| 801-900 | 14 | 8 | 10 | 30 | 6 |
+| 901-999 | 14 | 8 | 8 | 17 | 6 |
+
+Implementation notes from TAP behavior:
+
+- `Line ARE` is the ARE value after a line clear.
+- DAS charge should persist through line-clear delay and transition frames (no unintended DAS reset).
+
+#### 10.2 Optional high-speed preset (T.A. Death reference)
+
+If a Death-like profile is added later, use fixed `20G` gravity with this delay table:
+
+| Level range | ARE | Line ARE | DAS | Lock | Line clear |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0-99 | 18 | 14 | 12 | 30 | 12 |
+| 100-199 | 14 | 8 | 12 | 26 | 6 |
+| 200-299 | 14 | 8 | 11 | 22 | 6 |
+| 300-399 | 8 | 8 | 10 | 18 | 6 |
+| 400-499 | 7 | 7 | 8 | 15 | 5 |
+| 500-999 | 6 | 6 | 8 | 15 | 4 |
+
+---
+
+### 11. Motion / Presentation State
+
+The presentation state is shared by all themes.
+
+It exists to bridge the gap between logic and rendering while remaining theme-agnostic.
+
+Responsibilities include:
+
+- active piece display transform
+- entry motion state
+- lateral movement interpolation state
+- gravity display motion state
+- hard drop motion state if any visual treatment is desired
+- queue slide state
+- line clear slide state
+- lock shake state
+- screen or frame shake offsets
+
+This layer should contain the answer to questions such as:
+
+- Is lateral movement animated or instant?
+- Does the queue slide or snap?
+- How long does lock shake last?
+- How far do cleared lines move before disappearing?
+
+These behaviors must be shared across solid and noise themes.
+
+---
+
+### 12. Renderer
+
+The renderer should consume:
+
+- gameplay state
+- presentation state
+- theme materials
+
+The renderer should not invent gameplay behavior.
+
+Its job is to visualize already-determined state using the theme's materials and the common presentation rules.
+
+The renderer should support the following visual structure:
+
+- background layer
+- frame layer
+- settled field layer
+- active piece layer
+- Next queue layer
+- line-clear temporary layer
+- shake transform applied at the appropriate visual scope
+
+The renderer should allow theme switching without changing draw order or gameplay behavior.
+
+---
+
+### 13. Settled Field Strategy
+
+The settled field should conceptually be a composited surface.
+
+This means:
+
+- active pieces are drawn separately while falling
+- when a piece locks, its visual material is merged into the settled field surface
+- line clears operate on the settled field surface and/or its logical backing representation
+
+This idea is useful in both modes.
+
+In solid mode, it supports clean architectural symmetry with the final noise mode.
+
+In noise mode, it is central to the concept: once the piece locks, it should become part of the same static visual world as everything else.
+
+---
+
+### 14. Noise Theme Principles
+
+The noise theme must obey the following design rules:
+
+- all major visible elements are built from fixed white-noise materials
+- the noise is static unless the owning object moves or an explicit animation transforms it
+- the screen should not devolve into full-frame flicker chaos
+- movement is the primary source of visibility
+- stillness is concealment
+- lock shake and line clear motion should briefly reveal structure
+
+The effect depends on persistence.
+
+If the white noise is regenerated every frame for static surfaces, the concept collapses into random flicker rather than perceptual concealment.
+
+---
+
+### 15. Solid Theme Principles
+
+The solid theme is not a separate game design. It is a highly legible implementation of the same design.
+
+Its purposes are:
+
+- validating feel
+- validating correctness
+- debugging timing
+- debugging movement and presentation behavior
+- making theme-independent problems easy to see
+
+The solid theme should use the same rendering pipeline, the same animation logic, and the same role structure as the noise theme.
+
+It should differ only in assigned materials.
+
+---
+
+### 16. Entry and Queue Behavior
+
+The Next queue should be treated as part of the shared motion grammar of the game.
+
+When a piece is consumed:
+
+- the queue advances
+- the visible previews slide upward as an animation
+- a zero-duration option may be available for testing or alternate behavior
+
+When a new piece becomes active:
+
+- it should respect preloaded lateral input intent
+- its entry should not feel detached from the player's buffered action
+
+This matters especially in noise mode because the moment of entry is also a moment of visual discoverability.
+
+---
+
+### 17. Lock and Line-Clear Presentation
+
+These are intentional customizations to the presentation model.
+
+#### 17.1 Lock shake
+
+When a piece locks:
+
+- the frame should shake
+- the settled stack / playfield image should shake
+- the effect should be short, strong enough to reveal structure, and tunable
+
+This is not merely decorative. It is part of how the noise concept becomes playable.
+
+#### 17.2 Line-clear slide
+
+When line(s) clear:
+
+- the cleared row(s) should slide left beyond the frame before disappearing
+- gameplay pauses in a controlled way during the animation
+- the logical result after the animation remains a normal collapse of the field
+
+Again, this is not theme-specific. The motion exists in both themes. The difference is that in noise mode it also serves a perceptual purpose.
+
+---
+
+### 18. Data Ownership
+
+A clean implementation should separate ownership like this:
+
+#### Gameplay core owns
+- field occupancy grid
+- active piece logical position and orientation
+- queue contents
+- timers and rule state
+- grounded / lock state
+- line-clear results
+
+#### Presentation state owns
+- visual transforms
+- animation timers
+- shake offsets
+- queue slide offsets
+- line clear visual offsets
+
+#### Theme owns
+- materials/textures for all visual roles
+- any theme-specific palette or generation parameters
+
+#### Renderer owns
+- draw ordering
+- compositing behavior
+- presentation of the owned data above
+
+This separation keeps the system understandable and keeps noise from infecting unrelated code.
+
+---
+
+### 19. Development Strategy
+
+Development should proceed in this order:
+
+1. Implement gameplay core with the solid theme
+2. Tune feel until the game is satisfying as a falling-block game
+3. Build the full shared presentation system
+4. Refactor rendering around theme-owned persistent materials
+5. Add the white-noise theme
+6. Tune perceptual readability using motion, shake, and animation parameters
+
+The white-noise concept should be present from the start as the target identity, but the engine should be proven in a readable theme before relying on perceptual difficulty.
+
+---
+
+### 20. Testing Philosophy
+
+Testing should happen at two levels.
+
+#### 20.1 Gameplay tests
+- movement validity
+- rotation validity
+- grounded detection
+- lock timing
+- step-reset-only behavior
+- queue consumption
+- line clear correctness
+- spawn blocking behavior
+
+#### 20.2 Presentation tests
+- queue slide behavior
+- pre-entry lateral behavior
+- lock shake timing
+- line clear motion timing
+- theme switching invariants
+- visual compositing correctness
+
+The solid theme should be used as the primary debugging view for presentation behavior before testing final readability in noise mode.
+
+---
+
+### 21. Definition of Success
+
+The project succeeds when all of the following are true:
+
+- the underlying game feels disciplined and high quality
+- the engine behaves consistently across themes
+- switching between solid and noise changes only materials, not gameplay
+- the white-noise presentation makes motion informative and stillness concealing
+- the white-noise theme feels like the identity of the project rather than a late gimmick
+
+The desired end state is:
+
+- technically, one coherent engine
+- artistically, one unmistakably white-noise game
+
+---
+
+### 22. Reference Snapshot (Web)
+
+The concrete TGM2/TAP values above are based on community reverse-engineered references and wiki summaries:
+
+- https://tetris.wiki/wiki/Tetris_The_Absolute_The_Grand_Master_2
+- https://harddrop.com/wiki/ARS
+- https://harddrop.com/wiki/TGM_randomizer
+
+These should be treated as the baseline spec for this project unless contradicted by stronger primary evidence.
+
+---
+
+### 23. Short Summary
+
+This project is a TAP/TGM2-ARS-inspired falling-block engine with a theme system whose artistic center is a white-noise presentation.
+
+Its defining technical principle is that solid mode and noise mode must share the same gameplay, the same motion model, the same object model, and the same rendering structure.
+
+Its defining artistic principle is that the white-noise theme transforms the same underlying game into a perception challenge where motion becomes information and stillness becomes concealment.
