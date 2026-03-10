@@ -41,6 +41,7 @@ The gameplay baseline is:
 - no T-Spin handling
 - Up = hard drop + immediate lock (custom deviation)
 - Down = TAP/TGM2-style soft drop behavior (no extra custom lock rule)
+- custom piece-count-based gravity progression
 - line clear animation and lock shake are custom presentation behaviors
 
 The project is not trying to reproduce every historical detail exactly, but it is trying to stay disciplined and reference-driven rather than drifting into generic "Tetris-like" behavior.
@@ -201,6 +202,7 @@ The gameplay core should follow a TAP/TGM2-inspired baseline with explicit defau
 - step-reset-only lock behavior
 - one-row buffer zone above the visible 20-row field (effective logical height 21)
 - deterministic frame-based timing at 60 fps
+- custom speed progression that is not TAP section logic
 
 #### 8.2 ARS behavior requirements (TAP-style)
 
@@ -211,6 +213,7 @@ The gameplay core should follow a TAP/TGM2-inspired baseline with explicit defau
 - I piece does not wall-kick in TAP-style ARS
 - L/J/T center-column constraint must be respected (no generic SRS kick table)
 - no world-rule floor-kick behavior
+- no movement-reset or Infinity-style lock behavior
 
 #### 8.3 Randomizer requirements (TGM2/TAP)
 
@@ -224,8 +227,28 @@ The gameplay core should follow a TAP/TGM2-inspired baseline with explicit defau
 
 - preview count is `3` (TAP arcade baseline is `1`)
 - `Up` is hard drop with immediate lock (TAP sonic drop does not lock)
+- level progression is custom and based on locked piece count rather than TAP sections
 
 No other gameplay-rule deviations from TAP/TGM2 should be introduced without an explicit design update.
+
+#### 8.5 Core state model
+
+The top-level gameplay state should be exactly one of:
+
+- `ARE`
+- `Spawning`
+- `Active`
+- `LineClear`
+- `GameOver`
+
+`Grounded` is not a separate top-level state. It is a condition of the `Active` state.
+
+Additional state requirements:
+
+- the queue always contains enough pieces to show 3 previews and produce the next active piece
+- spawn failure is checked only during `Spawning`, after allowed spawn-time inputs are applied
+- locking inside the single hidden buffer row is legal
+- blocks above the hidden buffer row are outside the recoverable field
 
 ---
 
@@ -242,7 +265,7 @@ Responsibilities:
 - hard drop input
 - soft drop input
 - pre-entry lateral input intent
-- optional spawn-time rotation intent if later desired
+- stored IRS intent
 
 A key project requirement is that player intention can exist before the next piece becomes active.
 
@@ -252,6 +275,15 @@ This behavior is important for two reasons:
 
 - it supports the TGM-family feel
 - it strengthens the noise concept by giving the new piece motion at the moment of entry
+
+#### 9.1 Input rules
+
+- Left / Right during `ARE` and `LineClear` continue charging DAS
+- rotation input during `ARE` and `LineClear` is stored as IRS intent
+- `Up` and `Down` during `ARE` and `LineClear` do not create deferred drop actions
+- if both horizontal directions are held, the latest pressed direction wins
+- during spawn processing, apply IRS first and lateral intent second
+- if a spawn-time adjustment is invalid, it fails normally rather than invoking non-ARS rescue logic
 
 ---
 
@@ -279,73 +311,134 @@ At minimum, the configuration system should support parameters for:
 
 Even if early versions use provisional values, the architecture should assume these values are tunable data.
 
-#### 10.1 Default timing profile (TAP Master reference)
+#### 10.1 Frame step order
 
-The default profile should be Master-mode-like TAP timing, then adjusted only where this project explicitly diverges.
+Each simulation frame should resolve in this order:
 
-Internal gravity table (`G = internal / 256`):
+1. read current input state
+2. update edge-triggered input events, DAS state, and stored IRS intent
+3. advance the gameplay state machine
+4. update presentation state from finalized gameplay state
 
-| Level range | Internal gravity | Approx gravity |
+Gameplay must remain deterministic and presentation must never feed rules back into the simulation.
+
+#### 10.2 Active-piece rule order
+
+While in the `Active` state, the frame order should be:
+
+1. rotation input
+2. horizontal movement input and DAS repeat
+3. `Up` hard drop if pressed this frame
+4. `Down` soft drop / grounded lock behavior
+5. gravity
+6. grounded detection and lock-delay evaluation
+
+This ordering keeps player action primary and avoids gravity consuming a frame before input is resolved.
+
+#### 10.3 Movement, drop, and lock semantics
+
+- rotation uses TAP-style ARS only
+- non-`I` rotation test order is: basic rotation -> `+1` right -> `+1` left
+- `I` never kicks
+- successful shifts and rotations do not reset lock delay
+- only an actual downward step of at least one row resets lock delay
+- `Down` accelerates descent while airborne
+- if `Down` is newly pressed while the piece is already grounded, it may force immediate lock
+- `Up` moves the piece to its final reachable resting position and locks it immediately in the same gameplay step
+- `Up` grants no post-drop lock delay and no post-drop correction window
+- zangi-style play enabled by sonic drop should not exist in this project
+
+#### 10.4 State transition details
+
+`ARE`
+
+- no active piece exists
+- the ARE timer counts down once per frame
+- DAS and IRS may continue charging / buffering
+- when the timer reaches zero, transition to `Spawning`
+
+`Spawning`
+
+- dequeue the next piece and immediately refill the preview queue from the randomizer
+- create the piece using ARS spawn position and orientation
+- apply stored IRS intent first
+- apply pre-entry lateral intent second
+- if the resulting spawn state is invalid, transition to `GameOver`
+- otherwise transition to `Active`
+
+`Active`
+
+- the active piece owns type, position, orientation, gravity accumulator, grounded flag, and lock-delay timer
+- below `1G`, gravity uses fractional accumulation
+- at `1G` or more, the piece descends as far as allowed by collision
+- at `20G`, the piece settles instantly to its resting height for that frame but remains active until lock resolves
+- on the first grounded frame, start the lock-delay timer
+- while still grounded, decrement lock delay once per frame
+- if lock delay reaches zero, lock immediately
+
+`Lock resolution`
+
+- merge the piece into the logical field immediately
+- increment the locked-piece counter immediately
+- detect completed lines immediately
+- if no lines were cleared, start normal `ARE`
+- if one or more lines were cleared, transition to `LineClear`
+
+`LineClear`
+
+- no active piece exists
+- gameplay is paused except for input buffering, DAS charging, and IRS storage
+- cleared rows remain logically frozen during the line-clear delay
+- the field collapses exactly when the line-clear delay ends
+- after collapse, transition to `ARE`
+
+`GameOver`
+
+- game over occurs only when spawning the next piece fails after allowed spawn-time processing
+
+#### 10.5 Project default timing profile
+
+The project should use fixed TAP-like handling delays and a custom gravity ladder.
+
+Default handling delays (frames):
+
+| Parameter | Value |
+| --- | ---: |
+| ARE | 27 |
+| Line ARE | 27 |
+| DAS | 16 |
+| Lock delay | 30 |
+| Line clear delay | 40 |
+
+These values stay fixed across the whole game unless explicitly re-tuned later.
+
+#### 10.6 Custom gravity progression
+
+Gravity progression is based on the number of pieces locked, not TAP sections or level stops.
+
+Rules:
+
+- increase the gravity tier every `100` locked pieces
+- gravity is the only timing value that changes as progression advances
+- once gravity reaches `20G`, it stops increasing
+- reaching `20G` does not shorten lock delay, ARE, DAS, or line clear delay
+
+Recommended default gravity ladder (`G = internal / 256`):
+
+| Locked pieces | Internal gravity | Approx gravity |
 | --- | ---: | ---: |
-| 0-29 | 4 | 0.015625G |
-| 30-34 | 6 | 0.0234375G |
-| 35-39 | 8 | 0.03125G |
-| 40-49 | 10 | 0.0390625G |
-| 50-59 | 12 | 0.046875G |
-| 60-69 | 16 | 0.0625G |
-| 70-79 | 32 | 0.125G |
-| 80-89 | 48 | 0.1875G |
-| 90-99 | 64 | 0.25G |
-| 100-119 | 80 | 0.3125G |
-| 120-139 | 96 | 0.375G |
-| 140-159 | 112 | 0.4375G |
-| 160-169 | 128 | 0.5G |
-| 170-199 | 144 | 0.5625G |
-| 200-219 | 4 | 0.015625G |
-| 220-229 | 32 | 0.125G |
-| 230-232 | 64 | 0.25G |
-| 233-235 | 96 | 0.375G |
-| 236-238 | 128 | 0.5G |
-| 239-242 | 160 | 0.625G |
-| 243-246 | 192 | 0.75G |
-| 247-250 | 224 | 0.875G |
-| 251-299 | 256 | 1G |
-| 300-329 | 512 | 2G |
-| 330-359 | 768 | 3G |
-| 360-399 | 1024 | 4G |
-| 400-419 | 1280 | 5G |
-| 420-449 | 1024 | 4G |
-| 450-499 | 768 | 3G |
-| 500+ | 5120 | 20G |
+| 0-99 | 4 | 0.015625G |
+| 100-199 | 32 | 0.125G |
+| 200-299 | 64 | 0.25G |
+| 300-399 | 128 | 0.5G |
+| 400-499 | 256 | 1G |
+| 500-599 | 512 | 2G |
+| 600-699 | 768 | 3G |
+| 700-799 | 1024 | 4G |
+| 800-899 | 1280 | 5G |
+| 900+ | 5120 | 20G |
 
-Master delay table (frames):
-
-| Level range | ARE | Line ARE | DAS | Lock | Line clear |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 0-499 | 27 | 27 | 16 | 30 | 40 |
-| 500-600 | 27 | 27 | 10 | 30 | 25 |
-| 601-700 | 27 | 18 | 10 | 30 | 16 |
-| 701-800 | 18 | 14 | 10 | 30 | 12 |
-| 801-900 | 14 | 8 | 10 | 30 | 6 |
-| 901-999 | 14 | 8 | 8 | 17 | 6 |
-
-Implementation notes from TAP behavior:
-
-- `Line ARE` is the ARE value after a line clear.
-- DAS charge should persist through line-clear delay and transition frames (no unintended DAS reset).
-
-#### 10.2 Optional high-speed preset (T.A. Death reference)
-
-If a Death-like profile is added later, use fixed `20G` gravity with this delay table:
-
-| Level range | ARE | Line ARE | DAS | Lock | Line clear |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 0-99 | 18 | 14 | 12 | 30 | 12 |
-| 100-199 | 14 | 8 | 12 | 26 | 6 |
-| 200-299 | 14 | 8 | 11 | 22 | 6 |
-| 300-399 | 8 | 8 | 10 | 18 | 6 |
-| 400-499 | 7 | 7 | 8 | 15 | 5 |
-| 500-999 | 6 | 6 | 8 | 15 | 4 |
+This ladder is a project default, not a historical TAP table. It should be tuned for feel, but the progression rule itself should remain simple and piece-count-based.
 
 ---
 
@@ -559,9 +652,13 @@ Testing should happen at two levels.
 - grounded detection
 - lock timing
 - step-reset-only behavior
+- state-machine transition order
+- IRS and pre-entry lateral behavior
+- hard drop immediate lock behavior
 - queue consumption
 - line clear correctness
 - spawn blocking behavior
+- piece-count-based gravity progression
 
 #### 20.2 Presentation tests
 - queue slide behavior
@@ -599,6 +696,10 @@ The concrete TGM2/TAP values above are based on community reverse-engineered ref
 - https://tetris.wiki/wiki/Tetris_The_Absolute_The_Grand_Master_2
 - https://harddrop.com/wiki/ARS
 - https://harddrop.com/wiki/TGM_randomizer
+- https://tetris.wiki/wiki/Drop
+- https://tetris.wiki/wiki/TGM_Guide
+- https://tetris.wiki/wiki/Tetris_The_Grand_Master_3_Terror-Instinct
+- https://tetris.wiki/wiki/Tetris_The_Grand_Master_Ace
 
 These should be treated as the baseline spec for this project unless contradicted by stronger primary evidence.
 
