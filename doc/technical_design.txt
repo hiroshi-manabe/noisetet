@@ -42,7 +42,7 @@ The gameplay baseline is:
 - Up = hard drop + immediate lock (custom deviation)
 - Down = TAP/TGM2-style soft drop behavior (no extra custom lock rule)
 - custom piece-count-based gravity progression
-- line clear animation and lock shake are custom presentation behaviors
+- line clear animation and impact shake are custom presentation behaviors
 
 The project is not trying to reproduce every historical detail exactly, but it is trying to stay disciplined and reference-driven rather than drifting into generic "Tetris-like" behavior.
 
@@ -58,7 +58,7 @@ The project should be divided into the following high-level systems:
 
 2. **Presentation State**
    - Shared motion and animation model
-   - Active piece movement, entry motion, queue motion, lock shake, line clear motion
+   - Active piece movement, entry motion, queue motion, impact shake, line clear motion
    - Common across solid and noise themes
 
 3. **Theme / Material System**
@@ -260,6 +260,8 @@ Additional state requirements:
 - locking inside the single hidden buffer row is legal
 - blocks above the hidden buffer row are outside the recoverable field
 
+`Pause` is not a gameplay-core state. It should remain an application-level run-state that suspends simulation without changing the gameplay state machine.
+
 ---
 
 ### 9. Input System
@@ -295,6 +297,14 @@ This behavior is important for two reasons:
 - during spawn processing, apply IRS first and lateral intent second
 - if a spawn-time adjustment is invalid, it fails normally rather than invoking non-ARS rescue logic
 
+#### 9.2 Application pause control
+
+- the application should expose a pause toggle on `P`
+- pause is outside gameplay logic and should not be represented as a gameplay phase
+- while paused, gameplay simulation and presentation timers stop advancing
+- the current rendered frame remains visible and a pause overlay may be shown
+- unpause resumes from the same gameplay state with no accumulated simulation backlog
+
 ---
 
 ### 10. Timing and Simulation
@@ -316,8 +326,8 @@ At minimum, the configuration system should support parameters for:
 - lateral movement animation duration
 - queue slide duration
 - line clear slide duration
-- lock shake duration
-- lock shake amplitude
+- impact shake duration
+- impact shake amplitude
 
 Even if early versions use provisional values, the architecture should assume these values are tunable data.
 
@@ -468,14 +478,14 @@ Responsibilities include:
 - hard drop motion state if any visual treatment is desired
 - queue slide state
 - line clear slide state
-- lock shake state
+- impact shake state
 - screen or frame shake offsets
 
 This layer should contain the answer to questions such as:
 
 - Is lateral movement animated or instant?
 - Does the queue slide or snap?
-- How long does lock shake last?
+- How long does impact shake last?
 - How far do cleared lines move before disappearing?
 
 These behaviors must be shared across solid and noise themes.
@@ -540,7 +550,7 @@ The noise theme must obey the following design rules:
 - the screen should not devolve into full-frame flicker chaos
 - movement is the primary source of visibility
 - stillness is concealment
-- lock shake and line clear motion should briefly reveal structure
+- impact shake and line clear motion should briefly reveal structure
 
 The effect depends on persistence.
 
@@ -585,17 +595,21 @@ This matters especially in noise mode because the moment of entry is also a mome
 
 ---
 
-### 17. Lock and Line-Clear Presentation
+### 17. Impact and Line-Clear Presentation
 
 These are intentional customizations to the presentation model.
 
-#### 17.1 Lock shake
+#### 17.1 Impact shake
 
-When a piece locks:
+When an active piece first makes grounded contact:
 
 - the frame should shake
 - the settled stack / playfield image should shake
 - the effect should be short, strong enough to reveal structure, and tunable
+
+If an airborne hard drop locks immediately before a grounded frame can be displayed, it should still trigger the same impact shake.
+
+The same active piece should not retrigger impact shake repeatedly just by briefly leaving and re-touching the surface.
 
 This is not merely decorative. It is part of how the noise concept becomes playable.
 
@@ -679,7 +693,7 @@ Testing should happen at two levels.
 #### 20.2 Presentation tests
 - queue slide behavior
 - pre-entry lateral behavior
-- lock shake timing
+- impact shake timing
 - line clear motion timing
 - theme switching invariants
 - visual compositing correctness

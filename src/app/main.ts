@@ -1,14 +1,18 @@
 import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
-  PREVIEW_COUNT,
   createInitialGameState,
   getCellsForPiece,
   stepGame,
-  type GameState,
   type InputFrame,
   type Tetromino,
 } from "../core/index.js";
+import {
+  createPresentationState,
+  updatePresentationState,
+  type PresentationState,
+  type PresentationView,
+} from "../presentation/index.js";
 
 const VISIBLE_ROWS = FIELD_HEIGHT - 1;
 const CELL_SIZE = 24;
@@ -49,18 +53,35 @@ if (renderingContext === null) {
 const context: CanvasRenderingContext2D = renderingContext;
 
 let state = createInitialGameState({ seed: 7 });
+let presentationState: PresentationState = createPresentationState(state);
+let isPaused = false;
 let accumulator = 0;
 let previousTime = performance.now();
 
 window.addEventListener("keydown", (event) => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC"].includes(event.code)) {
+  if (
+    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP"].includes(
+      event.code,
+    )
+  ) {
     event.preventDefault();
   }
 
   pressedKeys.add(event.code);
 
+  if (event.code === "KeyP" && !event.repeat && state.phase !== "GameOver") {
+    isPaused = !isPaused;
+    accumulator = 0;
+    pressedKeys.clear();
+    return;
+  }
+
   if (state.phase === "GameOver" && event.code === "KeyR") {
     state = createInitialGameState({ seed: 7 });
+    presentationState = createPresentationState(state);
+    isPaused = false;
+    accumulator = 0;
+    pressedKeys.clear();
   }
 });
 
@@ -88,52 +109,61 @@ function drawCell(x: number, y: number, fill: string): void {
   context.strokeRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
 }
 
-function drawBoardGrid(): void {
+function drawBoardGrid(view: PresentationView): void {
+  const originX = BOARD_X + view.shakeOffset.x;
+  const originY = BOARD_Y + view.shakeOffset.y;
+
   context.fillStyle = "#131710";
-  context.fillRect(BOARD_X, BOARD_Y, BOARD_WIDTH, BOARD_HEIGHT);
+  context.fillRect(originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
 
   context.strokeStyle = "#4a5540";
   context.lineWidth = 2;
-  context.strokeRect(BOARD_X, BOARD_Y, BOARD_WIDTH, BOARD_HEIGHT);
+  context.strokeRect(originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
 
   context.strokeStyle = "rgba(238, 241, 223, 0.06)";
   context.lineWidth = 1;
 
   for (let x = 1; x < FIELD_WIDTH; x += 1) {
-    const gridX = BOARD_X + x * CELL_SIZE + 0.5;
+    const gridX = originX + x * CELL_SIZE + 0.5;
     context.beginPath();
-    context.moveTo(gridX, BOARD_Y);
-    context.lineTo(gridX, BOARD_Y + BOARD_HEIGHT);
+    context.moveTo(gridX, originY);
+    context.lineTo(gridX, originY + BOARD_HEIGHT);
     context.stroke();
   }
 
   for (let y = 1; y < VISIBLE_ROWS; y += 1) {
-    const gridY = BOARD_Y + y * CELL_SIZE + 0.5;
+    const gridY = originY + y * CELL_SIZE + 0.5;
     context.beginPath();
-    context.moveTo(BOARD_X, gridY);
-    context.lineTo(BOARD_X + BOARD_WIDTH, gridY);
+    context.moveTo(originX, gridY);
+    context.lineTo(originX + BOARD_WIDTH, gridY);
     context.stroke();
   }
 }
 
-function drawField(currentState: GameState): void {
-  for (let y = 1; y < currentState.field.length; y += 1) {
-    for (let x = 0; x < currentState.field[y].length; x += 1) {
-      const cell = currentState.field[y][x];
+function drawField(view: PresentationView): void {
+  const originX = BOARD_X + view.shakeOffset.x;
+  const originY = BOARD_Y + view.shakeOffset.y;
+
+  for (let y = 1; y < view.field.length; y += 1) {
+    for (let x = 0; x < view.field[y].length; x += 1) {
+      const cell = view.field[y][x];
       if (cell === null) {
         continue;
       }
 
-      drawCell(BOARD_X + x * CELL_SIZE, BOARD_Y + (y - 1) * CELL_SIZE, COLORS[cell]);
+      drawCell(originX + x * CELL_SIZE, originY + (y - 1) * CELL_SIZE, COLORS[cell]);
     }
   }
 }
 
-function drawActivePiece(currentState: GameState): void {
-  const activePiece = currentState.activePiece;
+function drawActivePiece(view: PresentationView): void {
+  const activePiece = view.activePiece;
   if (activePiece === null) {
     return;
   }
+
+  const originX = BOARD_X + view.shakeOffset.x;
+  const originY = BOARD_Y + view.shakeOffset.y;
 
   for (const cell of getCellsForPiece(activePiece)) {
     const y = activePiece.y + cell.y;
@@ -142,8 +172,8 @@ function drawActivePiece(currentState: GameState): void {
     }
 
     drawCell(
-      BOARD_X + (activePiece.x + cell.x) * CELL_SIZE,
-      BOARD_Y + (y - 1) * CELL_SIZE,
+      originX + (activePiece.x + cell.x) * CELL_SIZE,
+      originY + (y - 1) * CELL_SIZE,
       COLORS[activePiece.type],
     );
   }
@@ -171,7 +201,7 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   }
 }
 
-function drawPreviews(currentState: GameState): void {
+function drawPreviews(view: PresentationView): void {
   context.fillStyle = "#192017";
   context.fillRect(BOARD_X + BOARD_WIDTH + 26, BOARD_Y, 110, 276);
 
@@ -183,26 +213,26 @@ function drawPreviews(currentState: GameState): void {
   context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
   context.fillText("NEXT", BOARD_X + BOARD_WIDTH + 42, BOARD_Y + 20);
 
-  const previews = currentState.queue.slice(0, PREVIEW_COUNT);
-  previews.forEach((type, index) => {
+  view.queuePreviews.forEach((preview) => {
     const boxX = BOARD_X + BOARD_WIDTH + 42;
-    const boxY = BOARD_Y + 34 + index * 84;
+    const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 84;
 
     context.fillStyle = "#0f130f";
     context.fillRect(boxX, boxY, PREVIEW_BOX, PREVIEW_BOX);
     context.strokeStyle = "rgba(238, 241, 223, 0.12)";
     context.strokeRect(boxX + 0.5, boxY + 0.5, PREVIEW_BOX - 1, PREVIEW_BOX - 1);
-    drawPreviewPiece(type, boxX, boxY);
+    drawPreviewPiece(preview.type, boxX, boxY);
   });
 }
 
-function renderStats(currentState: GameState): void {
+function renderStats(view: PresentationView, paused: boolean): void {
   stats.innerHTML = [
-    ["Phase", currentState.phase],
-    ["Pieces", String(currentState.pieceCount)],
-    ["Gravity", String(currentState.gravityInternal)],
-    ["Active", currentState.activePiece?.type ?? "none"],
-    ["Lock", currentState.activePiece ? String(currentState.activePiece.lockDelayRemaining) : "-"],
+    ["Paused", paused ? "yes" : "no"],
+    ["Phase", view.phase],
+    ["Pieces", String(view.pieceCount)],
+    ["Gravity", String(view.gravityInternal)],
+    ["Active", view.activePiece?.type ?? "none"],
+    ["Lock", view.lockDelayRemaining === null ? "-" : String(view.lockDelayRemaining)],
   ]
     .map(
       ([label, value]) =>
@@ -211,17 +241,17 @@ function renderStats(currentState: GameState): void {
     .join("");
 }
 
-function render(currentState: GameState): void {
+function render(view: PresentationView): void {
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#10120e";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawBoardGrid();
-  drawField(currentState);
-  drawActivePiece(currentState);
-  drawPreviews(currentState);
+  drawBoardGrid(view);
+  drawField(view);
+  drawActivePiece(view);
+  drawPreviews(view);
 
-  if (currentState.phase === "GameOver") {
+  if (view.phase === "GameOver") {
     context.fillStyle = "rgba(0, 0, 0, 0.65)";
     context.fillRect(BOARD_X, BOARD_Y + 180, BOARD_WIDTH, 96);
     context.fillStyle = "#eef1df";
@@ -232,21 +262,41 @@ function render(currentState: GameState): void {
     context.fillText("Press R to restart", BOARD_X + 104, BOARD_Y + 244);
   }
 
-  renderStats(currentState);
+  if (isPaused) {
+    context.fillStyle = "rgba(0, 0, 0, 0.65)";
+    context.fillRect(BOARD_X, BOARD_Y + 180, BOARD_WIDTH, 96);
+    context.fillStyle = "#eef1df";
+    context.font = '18px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
+    context.fillText("PAUSED", BOARD_X + 132, BOARD_Y + 218);
+    context.fillStyle = "#a9b09b";
+    context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
+    context.fillText("Press P to resume", BOARD_X + 100, BOARD_Y + 244);
+  }
+
+  renderStats(view, isPaused);
 }
 
 function loop(now: number): void {
   accumulator += now - previousTime;
   previousTime = now;
 
+  if (isPaused) {
+    accumulator = 0;
+    render(presentationState.view);
+    requestAnimationFrame(loop);
+    return;
+  }
+
   while (accumulator >= FRAME_MS) {
+    const previousState = state;
     state = stepGame(state, buildInputFrame());
+    presentationState = updatePresentationState(presentationState, previousState, state);
     accumulator -= FRAME_MS;
   }
 
-  render(state);
+  render(presentationState.view);
   requestAnimationFrame(loop);
 }
 
-render(state);
+render(presentationState.view);
 requestAnimationFrame(loop);
