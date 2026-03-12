@@ -4,6 +4,7 @@ export interface PresentationConfig {
   queueSlideFrames: number;
   impactShakeFrames: number;
   impactShakeAmplitude: number;
+  lineClearSlideDistanceCells: number;
 }
 
 export interface ShakeOffset {
@@ -17,10 +18,22 @@ export interface QueuePreviewItem {
   yOffsetSlots: number;
 }
 
+export interface LineClearCellView {
+  x: number;
+  type: Tetromino;
+}
+
+export interface LineClearRowView {
+  y: number;
+  xOffsetCells: number;
+  cells: LineClearCellView[];
+}
+
 export interface PresentationView {
   phase: GamePhase;
   field: Field;
   activePiece: ActivePiece | null;
+  lineClearRows: LineClearRowView[];
   queuePreviews: QueuePreviewItem[];
   pieceCount: number;
   gravityInternal: number;

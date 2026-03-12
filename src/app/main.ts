@@ -179,6 +179,29 @@ function drawActivePiece(view: PresentationView): void {
   }
 }
 
+function drawLineClearRows(view: PresentationView): void {
+  if (view.lineClearRows.length === 0) {
+    return;
+  }
+
+  const originX = BOARD_X + view.shakeOffset.x;
+  const originY = BOARD_Y + view.shakeOffset.y;
+
+  for (const row of view.lineClearRows) {
+    if (row.y < 1) {
+      continue;
+    }
+
+    for (const cell of row.cells) {
+      drawCell(
+        originX + (cell.x + row.xOffsetCells) * CELL_SIZE,
+        originY + (row.y - 1) * CELL_SIZE,
+        COLORS[cell.type],
+      );
+    }
+  }
+}
+
 function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   const previewPiece = {
     type,
@@ -249,6 +272,7 @@ function render(view: PresentationView): void {
   drawBoardGrid(view);
   drawField(view);
   drawActivePiece(view);
+  drawLineClearRows(view);
   drawPreviews(view);
 
   if (view.phase === "GameOver") {

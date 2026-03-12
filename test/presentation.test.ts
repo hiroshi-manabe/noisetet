@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialGameState, stepGame } from "../src/core/index.js";
+import { createEmptyField, createInitialGameState, stepGame } from "../src/core/index.js";
 import {
   createPresentationState,
   updatePresentationState,
@@ -14,6 +14,41 @@ function advanceToActiveState() {
   }
 
   return state;
+}
+
+function createLineClearState() {
+  const field = createEmptyField();
+  for (let x = 4; x < 10; x += 1) {
+    field[20][x] = "T";
+  }
+
+  let state = createInitialGameState({ seed: 7, field });
+
+  for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+    state = stepGame(state);
+  }
+
+  state = {
+    ...state,
+    activePiece: {
+      type: "I",
+      rotation: "spawn",
+      x: 0,
+      y: 0,
+      gravityAccumulator: 0,
+      grounded: false,
+      lockDelayRemaining: state.config.timings.lockDelay,
+    },
+  };
+
+  return stepGame(state, {
+    left: false,
+    right: false,
+    rotateCW: false,
+    rotateCCW: false,
+    up: true,
+    down: false,
+  });
 }
 
 describe("presentation state", () => {
@@ -75,6 +110,45 @@ describe("presentation state", () => {
     expect(nextGameState.activePiece).toBeNull();
     expect(presentationState.impactShakeFramesRemaining).toBeGreaterThan(0);
     expect(Math.abs(presentationState.view.shakeOffset.x)).toBeGreaterThan(0);
+  });
+
+  it("builds a sliding overlay for cleared rows during line clear", () => {
+    const previousGameState = advanceToActiveState();
+    const currentGameState = createLineClearState();
+    let presentationState = createPresentationState(previousGameState);
+
+    presentationState = updatePresentationState(presentationState, previousGameState, currentGameState);
+
+    expect(currentGameState.phase).toBe("LineClear");
+    expect(presentationState.view.lineClearRows).toHaveLength(1);
+    expect(presentationState.view.lineClearRows[0]?.y).toBe(20);
+    expect(presentationState.view.lineClearRows[0]?.cells).toHaveLength(10);
+    expect(presentationState.view.field[20].every((cell) => cell === null)).toBe(true);
+    expect(presentationState.view.lineClearRows[0]?.xOffsetCells).toBe(0);
+  });
+
+  it("advances the cleared-row slide over line-clear frames", () => {
+    let previousGameState = createLineClearState();
+    let presentationState = createPresentationState(previousGameState);
+
+    let nextGameState = stepGame(previousGameState);
+    presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+
+    expect(nextGameState.phase).toBe("LineClear");
+    expect(presentationState.view.lineClearRows[0]?.xOffsetCells).toBeLessThan(0);
+
+    previousGameState = nextGameState;
+    for (let frame = 0; frame < previousGameState.config.timings.lineClearDelay; frame += 1) {
+      nextGameState = stepGame(previousGameState);
+      presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+      previousGameState = nextGameState;
+      if (nextGameState.phase !== "LineClear") {
+        break;
+      }
+    }
+
+    expect(previousGameState.phase).toBe("ARE");
+    expect(presentationState.view.lineClearRows).toHaveLength(0);
   });
 
   it("does not retrigger impact shake after the same piece re-grounds", () => {

@@ -1,5 +1,6 @@
-import type { GameState } from "../core/types.js";
+import type { Field, GameState, Tetromino } from "../core/types.js";
 import type {
+  LineClearRowView,
   PresentationConfig,
   PresentationState,
   PresentationView,
@@ -11,6 +12,7 @@ export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   queueSlideFrames: 8,
   impactShakeFrames: 6,
   impactShakeAmplitude: 4,
+  lineClearSlideDistanceCells: 12,
 };
 
 function arraysEqual<T>(left: readonly T[], right: readonly T[]): boolean {
@@ -50,6 +52,44 @@ function buildQueuePreviews(
   }));
 }
 
+function cloneField(field: Field): Field {
+  return field.map((row) => [...row]);
+}
+
+function buildRenderedField(gameState: GameState): Field {
+  if (gameState.phase !== "LineClear" || gameState.pendingClearedRows.length === 0) {
+    return gameState.field;
+  }
+
+  const renderedField = cloneField(gameState.field);
+  for (const rowIndex of gameState.pendingClearedRows) {
+    renderedField[rowIndex].fill(null);
+  }
+  return renderedField;
+}
+
+function buildLineClearRows(
+  gameState: GameState,
+  config: PresentationConfig,
+): LineClearRowView[] {
+  if (gameState.phase !== "LineClear" || gameState.pendingClearedRows.length === 0) {
+    return [];
+  }
+
+  const totalFrames = Math.max(1, gameState.config.timings.lineClearDelay);
+  const elapsedFrames = totalFrames - gameState.lineClearFramesRemaining;
+  const progress = Math.max(0, Math.min(1, elapsedFrames / totalFrames));
+  const xOffsetCells = progress === 0 ? 0 : -config.lineClearSlideDistanceCells * progress;
+
+  return gameState.pendingClearedRows.map((rowIndex) => ({
+    y: rowIndex,
+    xOffsetCells,
+    cells: gameState.field[rowIndex]
+      .map((cell, x) => (cell === null ? null : { x, type: cell }))
+      .filter((cell): cell is { x: number; type: Tetromino } => cell !== null),
+  }));
+}
+
 function buildView(
   gameState: GameState,
   queueSlideFramesRemaining: number,
@@ -58,8 +98,9 @@ function buildView(
 ): PresentationView {
   return {
     phase: gameState.phase,
-    field: gameState.field,
+    field: buildRenderedField(gameState),
     activePiece: gameState.activePiece,
+    lineClearRows: buildLineClearRows(gameState, config),
     queuePreviews: buildQueuePreviews(gameState, queueSlideFramesRemaining, config),
     pieceCount: gameState.pieceCount,
     gravityInternal: gameState.gravityInternal,
