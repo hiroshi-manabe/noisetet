@@ -1,5 +1,6 @@
 import type { Field, GameState, Tetromino } from "../core/types.js";
 import type {
+  CellOffsetFloat,
   LineClearRowView,
   PresentationConfig,
   PresentationState,
@@ -13,7 +14,12 @@ export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   impactShakeFrames: 6,
   impactShakeAmplitude: 4,
   lineClearSlideDistanceCells: 12,
+  activePieceMotionFrames: 4,
+  entryMotionFrames: 6,
+  entryMotionDistanceCells: 0.75,
 };
+
+const ZERO_CELL_OFFSET: CellOffsetFloat = { x: 0, y: 0 };
 
 function arraysEqual<T>(left: readonly T[], right: readonly T[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -90,16 +96,46 @@ function buildLineClearRows(
   }));
 }
 
+function buildActivePieceOffset(
+  activePieceMotionOffset: CellOffsetFloat,
+  activePieceMotionFramesRemaining: number,
+  entryMotionFramesRemaining: number,
+  config: PresentationConfig,
+): CellOffsetFloat {
+  const movementFactor =
+    config.activePieceMotionFrames > 0
+      ? activePieceMotionFramesRemaining / config.activePieceMotionFrames
+      : 0;
+  const entryFactor =
+    config.entryMotionFrames > 0 ? entryMotionFramesRemaining / config.entryMotionFrames : 0;
+
+  return {
+    x: activePieceMotionOffset.x * movementFactor,
+    y:
+      activePieceMotionOffset.y * movementFactor -
+      config.entryMotionDistanceCells * entryFactor,
+  };
+}
+
 function buildView(
   gameState: GameState,
   queueSlideFramesRemaining: number,
   impactShakeFramesRemaining: number,
+  activePieceMotionOffset: CellOffsetFloat,
+  activePieceMotionFramesRemaining: number,
+  entryMotionFramesRemaining: number,
   config: PresentationConfig,
 ): PresentationView {
   return {
     phase: gameState.phase,
     field: buildRenderedField(gameState),
     activePiece: gameState.activePiece,
+    activePieceOffset: buildActivePieceOffset(
+      activePieceMotionOffset,
+      activePieceMotionFramesRemaining,
+      entryMotionFramesRemaining,
+      config,
+    ),
     lineClearRows: buildLineClearRows(gameState, config),
     queuePreviews: buildQueuePreviews(gameState, queueSlideFramesRemaining, config),
     pieceCount: gameState.pieceCount,
@@ -117,8 +153,11 @@ export function createPresentationState(
     config,
     queueSlideFramesRemaining: 0,
     impactShakeFramesRemaining: 0,
+    activePieceMotionFramesRemaining: 0,
+    entryMotionFramesRemaining: 0,
     hasTriggeredImpactShakeForCurrentPiece: false,
-    view: buildView(gameState, 0, 0, config),
+    activePieceMotionOffset: ZERO_CELL_OFFSET,
+    view: buildView(gameState, 0, 0, ZERO_CELL_OFFSET, 0, 0, config),
   };
 }
 
@@ -160,16 +199,55 @@ export function updatePresentationState(
     ? previousPresentationState.config.impactShakeFrames
     : Math.max(0, previousPresentationState.impactShakeFramesRemaining - 1);
 
+  const previousActivePiece = previousGameState.activePiece;
+  const currentActivePiece = currentGameState.activePiece;
+  const canInterpolateActivePiece =
+    previousActivePiece !== null && currentActivePiece !== null;
+  const activePieceMoved = canInterpolateActivePiece
+    ? previousActivePiece.x !== currentActivePiece.x ||
+      previousActivePiece.y !== currentActivePiece.y
+    : false;
+
+  const activePieceMotionOffset =
+    spawnedNewActivePiece || currentActivePiece === null
+      ? ZERO_CELL_OFFSET
+      : activePieceMoved
+        ? {
+            x: previousActivePiece!.x - currentActivePiece.x,
+            y: previousActivePiece!.y - currentActivePiece.y,
+          }
+        : previousPresentationState.activePieceMotionOffset;
+
+  const activePieceMotionFramesRemaining =
+    spawnedNewActivePiece || currentActivePiece === null
+      ? 0
+      : activePieceMoved
+        ? previousPresentationState.config.activePieceMotionFrames
+        : Math.max(0, previousPresentationState.activePieceMotionFramesRemaining - 1);
+
+  const entryMotionFramesRemaining =
+    currentActivePiece === null
+      ? 0
+      : spawnedNewActivePiece
+        ? previousPresentationState.config.entryMotionFrames
+        : Math.max(0, previousPresentationState.entryMotionFramesRemaining - 1);
+
   return {
     ...previousPresentationState,
     queueSlideFramesRemaining,
     impactShakeFramesRemaining,
+    activePieceMotionFramesRemaining,
+    entryMotionFramesRemaining,
     hasTriggeredImpactShakeForCurrentPiece:
       hasTriggeredImpactShakeForCurrentPiece || impactTriggered,
+    activePieceMotionOffset,
     view: buildView(
       currentGameState,
       queueSlideFramesRemaining,
       impactShakeFramesRemaining,
+      activePieceMotionOffset,
+      activePieceMotionFramesRemaining,
+      entryMotionFramesRemaining,
       previousPresentationState.config,
     ),
   };

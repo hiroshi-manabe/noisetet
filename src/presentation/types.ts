@@ -5,9 +5,17 @@ export interface PresentationConfig {
   impactShakeFrames: number;
   impactShakeAmplitude: number;
   lineClearSlideDistanceCells: number;
+  activePieceMotionFrames: number;
+  entryMotionFrames: number;
+  entryMotionDistanceCells: number;
 }
 
 export interface ShakeOffset {
+  x: number;
+  y: number;
+}
+
+export interface CellOffsetFloat {
   x: number;
   y: number;
 }
@@ -33,6 +41,7 @@ export interface PresentationView {
   phase: GamePhase;
   field: Field;
   activePiece: ActivePiece | null;
+  activePieceOffset: CellOffsetFloat;
   lineClearRows: LineClearRowView[];
   queuePreviews: QueuePreviewItem[];
   pieceCount: number;
@@ -45,6 +54,9 @@ export interface PresentationState {
   config: PresentationConfig;
   queueSlideFramesRemaining: number;
   impactShakeFramesRemaining: number;
+  activePieceMotionFramesRemaining: number;
+  entryMotionFramesRemaining: number;
   hasTriggeredImpactShakeForCurrentPiece: boolean;
+  activePieceMotionOffset: CellOffsetFloat;
   view: PresentationView;
 }

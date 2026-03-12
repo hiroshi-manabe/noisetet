@@ -172,8 +172,8 @@ function drawActivePiece(view: PresentationView): void {
     }
 
     drawCell(
-      originX + (activePiece.x + cell.x) * CELL_SIZE,
-      originY + (y - 1) * CELL_SIZE,
+      originX + (activePiece.x + cell.x + view.activePieceOffset.x) * CELL_SIZE,
+      originY + (y - 1 + view.activePieceOffset.y) * CELL_SIZE,
       COLORS[activePiece.type],
     );
   }

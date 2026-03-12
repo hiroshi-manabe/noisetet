@@ -76,6 +76,67 @@ describe("presentation state", () => {
     expect(presentationState.view.queuePreviews[0]?.yOffsetSlots).toBeGreaterThan(0);
   });
 
+  it("applies entry motion when a new active piece spawns", () => {
+    let previousGameState = createInitialGameState({ seed: 7 });
+    let presentationState = createPresentationState(previousGameState);
+    let nextGameState = previousGameState;
+
+    for (let frame = 0; frame < previousGameState.config.timings.are + 1; frame += 1) {
+      nextGameState = stepGame(previousGameState);
+      presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+      previousGameState = nextGameState;
+    }
+
+    expect(nextGameState.phase).toBe("Active");
+    expect(presentationState.view.activePieceOffset.y).toBeLessThan(0);
+
+    const initialOffsetY = presentationState.view.activePieceOffset.y;
+    nextGameState = stepGame(previousGameState);
+    presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+
+    expect(presentationState.view.activePieceOffset.y).toBeGreaterThan(initialOffsetY);
+  });
+
+  it("applies horizontal interpolation when the active piece shifts", () => {
+    const previousGameState = advanceToActiveState();
+    let presentationState = createPresentationState(previousGameState);
+
+    const nextGameState = stepGame(previousGameState, {
+      left: false,
+      right: true,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: false,
+    });
+    presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+
+    expect(nextGameState.activePiece?.x).toBe((previousGameState.activePiece?.x ?? 0) + 1);
+    expect(presentationState.view.activePieceOffset.x).toBeLessThan(0);
+  });
+
+  it("applies vertical interpolation when gravity moves the active piece", () => {
+    const baseGameState = advanceToActiveState();
+    if (baseGameState.activePiece === null) {
+      throw new Error("Expected an active piece for gravity interpolation test.");
+    }
+
+    const previousGameState = {
+      ...baseGameState,
+      activePiece: {
+        ...baseGameState.activePiece,
+        gravityAccumulator: 255,
+      },
+    };
+    let presentationState = createPresentationState(previousGameState);
+
+    const nextGameState = stepGame(previousGameState);
+    presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+
+    expect(nextGameState.activePiece?.y).toBe((previousGameState.activePiece?.y ?? 0) + 1);
+    expect(presentationState.view.activePieceOffset.y).toBeLessThan(0);
+  });
+
   it("starts impact shake on the first grounded contact", () => {
     let previousGameState = advanceToActiveState();
     let presentationState = createPresentationState(previousGameState);
