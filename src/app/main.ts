@@ -8,10 +8,11 @@ import {
 } from "../core/index.js";
 import { createHudTextures } from "./hudTextures.js";
 import {
+  BOOT_MODE_ENV_KEY,
   BOOT_MODE_STORAGE_KEY,
   createBootSession,
   isDebugMode,
-  resolveBootMode,
+  resolveBootModeFromSources,
   type BootMode,
 } from "./mode.js";
 import {
@@ -79,7 +80,10 @@ const hudTextures = createHudTextures();
 
 function readBootMode(): BootMode {
   try {
-    return resolveBootMode(window.localStorage.getItem(BOOT_MODE_STORAGE_KEY));
+    return resolveBootModeFromSources(
+      import.meta.env[BOOT_MODE_ENV_KEY],
+      window.localStorage.getItem(BOOT_MODE_STORAGE_KEY),
+    );
   } catch {
     return "normal";
   }

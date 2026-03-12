@@ -1,15 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BOOT_MODE_ENV_KEY,
   createBootSession,
   isDebugMode,
   resolveBootMode,
+  resolveBootModeFromSources,
 } from "../src/app/mode.js";
 
 describe("boot modes", () => {
   it("falls back to normal for unknown storage values", () => {
     expect(resolveBootMode(null)).toBe("normal");
     expect(resolveBootMode("mystery")).toBe("normal");
+  });
+
+  it("accepts explicit normal mode strings", () => {
+    expect(resolveBootMode("normal")).toBe("normal");
+  });
+
+  it("prefers the env-configured boot mode over storage", () => {
+    expect(resolveBootModeFromSources("debug20g", "debug")).toBe("debug20g");
+    expect(resolveBootModeFromSources("normal", "debug")).toBe("normal");
+    expect(resolveBootModeFromSources(undefined, "debug")).toBe("debug");
   });
 
   it("identifies debug-capable modes", () => {
@@ -30,5 +42,9 @@ describe("boot modes", () => {
     expect(session.state.pieceCount).toBe(500);
     expect(session.state.gravityInternal).toBe(5120);
     expect(session.state.score).toBe(0);
+  });
+
+  it("exports the Vite env key used for boot mode", () => {
+    expect(BOOT_MODE_ENV_KEY).toBe("VITE_BOOT_MODE");
   });
 });

@@ -1,6 +1,7 @@
 import { createInitialGameState, type GameState } from "../core/index.js";
 
 export const BOOT_MODE_STORAGE_KEY = "noisetet:mode";
+export const BOOT_MODE_ENV_KEY = "VITE_BOOT_MODE";
 
 export type BootMode = "normal" | "debug" | "debug20g";
 
@@ -10,12 +11,23 @@ export interface BootSession {
   state: GameState;
 }
 
-export function resolveBootMode(rawValue: string | null): BootMode {
-  if (rawValue === "debug" || rawValue === "debug20g") {
+function parseBootMode(rawValue: string | null | undefined): BootMode | null {
+  if (rawValue === "normal" || rawValue === "debug" || rawValue === "debug20g") {
     return rawValue;
   }
 
-  return "normal";
+  return null;
+}
+
+export function resolveBootMode(rawValue: string | null | undefined): BootMode {
+  return parseBootMode(rawValue) ?? "normal";
+}
+
+export function resolveBootModeFromSources(
+  envValue: string | undefined,
+  storageValue: string | null,
+): BootMode {
+  return parseBootMode(envValue) ?? parseBootMode(storageValue) ?? "normal";
 }
 
 export function isDebugMode(mode: BootMode): boolean {

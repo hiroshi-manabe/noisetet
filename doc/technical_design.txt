@@ -347,6 +347,13 @@ Rules:
 - no in-game mode transitions are required
 - debug modes should be entered only through a hidden startup mechanism rather than a visible menu
 
+Development boot mechanism:
+
+- the application may read a dev-only startup mode from the Vite environment via `VITE_BOOT_MODE`
+- the development scripts should include direct entry points for `debug` and `debug20g`
+- a hidden persisted storage override may still exist as a fallback
+- if both environment and storage are present, the environment value takes precedence
+
 ---
 
 ### 10. Timing and Simulation
