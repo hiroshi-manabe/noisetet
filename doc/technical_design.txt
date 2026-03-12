@@ -42,7 +42,9 @@ The gameplay baseline is:
 - Up = hard drop + immediate lock (custom deviation)
 - Down = TAP/TGM2-style soft drop behavior (no extra custom lock rule)
 - custom piece-count-based gravity progression
+- custom score based on piece count, cleared lines, and bravo
 - line clear animation and impact shake are custom presentation behaviors
+- separate user HUD and debug HUD
 
 The project is not trying to reproduce every historical detail exactly, but it is trying to stay disciplined and reference-driven rather than drifting into generic "Tetris-like" behavior.
 
@@ -198,7 +200,7 @@ Responsibilities:
 - grounded detection
 - line clear detection
 - ARE and other transition states
-- scoring if later added
+- scoring
 
 The gameplay core must not know whether the piece is drawn as a colored shape or as white noise.
 
@@ -262,6 +264,29 @@ Additional state requirements:
 
 `Pause` is not a gameplay-core state. It should remain an application-level run-state that suspends simulation without changing the gameplay state machine.
 
+#### 8.6 Scoring requirements
+
+Scoring is intentionally simpler than TAP.
+
+Rules:
+
+- a piece that clears `0` lines awards `0` score
+- base line-clear values are:
+  - `1 line = 100`
+  - `2 lines = 300`
+  - `3 lines = 500`
+  - `4 lines = 800`
+- score scales by piece count using:
+  - `levelMultiplier = (100 + piecesBeforeLock) / 100`
+- a bravo applies a `x4` multiplier
+- combo, soft-drop, hard-drop-distance, sonic-drop, and speed bonuses do not exist
+
+Recommended formula:
+
+`scoreGain = floor(clearBase[linesCleared] * levelMultiplier) * bravoMultiplier`
+
+This keeps score readable and arcade-like without inheriting TAP's full scoring identity.
+
 ---
 
 ### 9. Input System
@@ -304,6 +329,23 @@ This behavior is important for two reasons:
 - while paused, gameplay simulation and presentation timers stop advancing
 - the current rendered frame remains visible and a pause overlay may be shown
 - unpause resumes from the same gameplay state with no accumulated simulation backlog
+
+#### 9.3 Application boot modes
+
+The application should support three boot modes:
+
+- `normal`
+- `debug`
+- `debug20g`
+
+Rules:
+
+- `normal` is the user-facing mode and starts unpaused
+- `debug` is non-user-facing and starts paused
+- `debug20g` is non-user-facing and starts paused
+- `debug20g` should initialize directly into `20G` conditions with piece count set to `500`
+- no in-game mode transitions are required
+- debug modes should be entered only through a hidden startup mechanism rather than a visible menu
 
 ---
 
@@ -438,27 +480,38 @@ Gravity progression is based on the number of pieces locked, not TAP sections or
 
 Rules:
 
-- increase the gravity tier every `100` locked pieces
+- gravity is a monotonic function of locked piece count
 - gravity is the only timing value that changes as progression advances
-- once gravity reaches `20G`, it stops increasing
+- before `20G`, the maximum gravity should be approximately `5G`
+- at `500` locked pieces, gravity jumps to `20G`
 - reaching `20G` does not shorten lock delay, ARE, DAS, or line clear delay
 
-Recommended default gravity ladder (`G = internal / 256`):
+Recommended default formula:
 
-| Locked pieces | Internal gravity | Approx gravity |
-| --- | ---: | ---: |
-| 0-99 | 4 | 0.015625G |
-| 100-199 | 32 | 0.125G |
-| 200-299 | 64 | 0.25G |
-| 300-399 | 128 | 0.5G |
-| 400-499 | 256 | 1G |
-| 500-599 | 512 | 2G |
-| 600-699 | 768 | 3G |
-| 700-799 | 1024 | 4G |
-| 800-899 | 1280 | 5G |
-| 900+ | 5120 | 20G |
+For `pieceCount < 500`:
 
-This ladder is a project default, not a historical TAP table. It should be tuned for feel, but the progression rule itself should remain simple and piece-count-based.
+- `p = pieceCount / 499`
+- `g0 = 4 / 256`
+- `gravityG = g0 + (5 - g0) * p^2`
+- `internalGravity = round(gravityG * 256)`
+
+For `pieceCount >= 500`:
+
+- `internalGravity = 5120` (`20G`)
+
+This curve is intentionally inspired by the broad feel of TGM/TAP acceleration without copying TAP's exact gravity table or its non-monotonic dips.
+
+Useful checkpoints:
+
+| Locked pieces | Approx gravity |
+| --- | ---: |
+| 0 | 0.015625G |
+| 100 | about 0.22G |
+| 200 | about 0.82G |
+| 300 | about 1.82G |
+| 400 | about 3.22G |
+| 499 | about 5G |
+| 500+ | 20G |
 
 ---
 
@@ -511,6 +564,8 @@ The renderer should support the following visual structure:
 - settled field layer
 - active piece layer
 - Next queue layer
+- user HUD layer
+- debug HUD layer
 - line-clear temporary layer
 - shake transform applied at the appropriate visual scope
 
@@ -520,6 +575,33 @@ Renderer requirements for piece materials:
 - `O` keeps a fixed material orientation regardless of gameplay rotation state
 
 The renderer should allow theme switching without changing draw order or gameplay behavior.
+
+#### 12.1 HUD requirements
+
+The project should distinguish between a user-facing HUD and a debug HUD.
+
+User-facing HUD:
+
+- displayed below the `NEXT` panel
+- shows:
+  - `SCORE`
+  - score value
+  - `PIECES`
+  - piece count
+- uses no debug-only state labels or internal counters
+
+Debug HUD:
+
+- exists only in debug boot modes
+- may show any internal state useful for development
+- is not part of the intended user presentation
+
+Text rendering requirements:
+
+- `SCORE` and `PIECES` are rendered as textured image assets rather than dynamic text
+- numeric digits are rendered from textured digit assets rather than font rasterization
+- `SCORE` and `PIECES` should blink
+- numeric values should remain stable and readable rather than blinking
 
 ---
 
@@ -681,6 +763,7 @@ Testing should happen at two levels.
 - rotation validity
 - grounded detection
 - lock timing
+- scoring correctness
 - step-reset-only behavior
 - state-machine transition order
 - IRS and pre-entry lateral behavior
@@ -689,12 +772,16 @@ Testing should happen at two levels.
 - line clear correctness
 - spawn blocking behavior
 - piece-count-based gravity progression
+- debug20g boot behavior
+- `20G` input behavior with IRS, DAS preload, and active-phase manipulation
 
 #### 20.2 Presentation tests
 - queue slide behavior
 - pre-entry lateral behavior
 - impact shake timing
 - line clear motion timing
+- user HUD vs debug HUD separation
+- textured HUD label / digit rendering behavior
 - theme switching invariants
 - visual compositing correctness
 
