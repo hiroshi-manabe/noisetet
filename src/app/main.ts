@@ -1,12 +1,19 @@
 import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
-  createInitialGameState,
   getCellsForPiece,
   stepGame,
   type InputFrame,
   type Tetromino,
 } from "../core/index.js";
+import { createHudTextures } from "./hudTextures.js";
+import {
+  BOOT_MODE_STORAGE_KEY,
+  createBootSession,
+  isDebugMode,
+  resolveBootMode,
+  type BootMode,
+} from "./mode.js";
 import {
   createPresentationState,
   updatePresentationState,
@@ -22,6 +29,11 @@ const BOARD_WIDTH = FIELD_WIDTH * CELL_SIZE;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE;
 const PREVIEW_BOX = 78;
 const FRAME_MS = 1000 / 60;
+const HUD_PANEL_X = BOARD_X + BOARD_WIDTH + 26;
+const HUD_PANEL_Y = BOARD_Y + 292;
+const HUD_PANEL_WIDTH = 110;
+const HUD_PANEL_HEIGHT = 212;
+const LABEL_BLINK_FRAMES = 30;
 
 const COLORS: Record<Tetromino, string> = {
   I: "#77f0e3",
@@ -35,13 +47,25 @@ const COLORS: Record<Tetromino, string> = {
 
 const pressedKeys = new Set<string>();
 
+const shellElement = document.querySelector<HTMLElement>("#shell");
+const sidebarElement = document.querySelector<HTMLElement>("#sidebar");
+const subtitleElement = document.querySelector<HTMLElement>("#subtitle");
 const canvasElement = document.querySelector<HTMLCanvasElement>("#game");
 const statsElement = document.querySelector<HTMLDivElement>("#stats");
 
-if (canvasElement === null || statsElement === null) {
+if (
+  shellElement === null ||
+  sidebarElement === null ||
+  subtitleElement === null ||
+  canvasElement === null ||
+  statsElement === null
+) {
   throw new Error("App root elements not found.");
 }
 
+const shell: HTMLElement = shellElement;
+const sidebar: HTMLElement = sidebarElement;
+const subtitle: HTMLElement = subtitleElement;
 const canvas: HTMLCanvasElement = canvasElement;
 const stats: HTMLDivElement = statsElement;
 
@@ -51,12 +75,38 @@ if (renderingContext === null) {
 }
 
 const context: CanvasRenderingContext2D = renderingContext;
+const hudTextures = createHudTextures();
 
-let state = createInitialGameState({ seed: 7 });
+function readBootMode(): BootMode {
+  try {
+    return resolveBootMode(window.localStorage.getItem(BOOT_MODE_STORAGE_KEY));
+  } catch {
+    return "normal";
+  }
+}
+
+const bootSession = createBootSession(readBootMode(), 7);
+const debugMode = isDebugMode(bootSession.mode);
+
+let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
-let isPaused = false;
+let isPaused = bootSession.paused;
+let uiAnimationFrames = 0;
 let accumulator = 0;
 let previousTime = performance.now();
+
+if (!debugMode) {
+  sidebar.style.display = "none";
+  shell.style.gridTemplateColumns = "1fr";
+  shell.style.width = "min(700px, calc(100vw - 32px))";
+}
+
+subtitle.textContent =
+  bootSession.mode === "normal"
+    ? "Solid Theme Prototype"
+    : bootSession.mode === "debug20g"
+      ? "Solid Theme Debug 20G"
+      : "Solid Theme Debug";
 
 window.addEventListener("keydown", (event) => {
   if (
@@ -77,9 +127,10 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (state.phase === "GameOver" && event.code === "KeyR") {
-    state = createInitialGameState({ seed: 7 });
+    state = createBootSession(bootSession.mode, 7).state;
     presentationState = createPresentationState(state);
-    isPaused = false;
+    isPaused = bootSession.paused;
+    uiAnimationFrames = 0;
     accumulator = 0;
     pressedKeys.clear();
   }
@@ -248,10 +299,62 @@ function drawPreviews(view: PresentationView): void {
   });
 }
 
+function drawTexturedNumber(value: number, x: number, y: number): void {
+  const digits = String(Math.max(0, Math.floor(value)));
+  const totalWidth = digits.length * hudTextures.digitWidth;
+  const availableWidth = HUD_PANEL_WIDTH - 16;
+  const scale = totalWidth > availableWidth ? availableWidth / totalWidth : 1;
+  let cursorX = x + Math.floor((availableWidth - totalWidth * scale) / 2);
+
+  for (const digit of digits) {
+    const texture = hudTextures.digits[digit];
+    context.drawImage(
+      texture,
+      cursorX,
+      y,
+      Math.floor(hudTextures.digitWidth * scale),
+      Math.floor(hudTextures.digitHeight * scale),
+    );
+    cursorX += hudTextures.digitWidth * scale;
+  }
+}
+
+function getBlinkAlpha(): number {
+  const phase = uiAnimationFrames % (LABEL_BLINK_FRAMES * 2);
+  return phase < LABEL_BLINK_FRAMES ? 1 : 0.38;
+}
+
+function drawHudLabel(texture: HTMLCanvasElement, x: number, y: number, alpha: number): void {
+  context.save();
+  context.globalAlpha = alpha;
+  context.drawImage(texture, x, y);
+  context.restore();
+}
+
+function drawUserHud(view: PresentationView): void {
+  context.fillStyle = "#192017";
+  context.fillRect(HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
+
+  context.strokeStyle = "#4a5540";
+  context.lineWidth = 2;
+  context.strokeRect(HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
+
+  const blinkAlpha = getBlinkAlpha();
+  const labelX = HUD_PANEL_X + 8;
+
+  drawHudLabel(hudTextures.labels.score, labelX, HUD_PANEL_Y + 16, blinkAlpha);
+  drawTexturedNumber(view.score, HUD_PANEL_X + 8, HUD_PANEL_Y + 52);
+
+  drawHudLabel(hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 108, blinkAlpha);
+  drawTexturedNumber(view.pieceCount, HUD_PANEL_X + 8, HUD_PANEL_Y + 144);
+}
+
 function renderStats(view: PresentationView, paused: boolean): void {
   stats.innerHTML = [
+    ["Mode", bootSession.mode],
     ["Paused", paused ? "yes" : "no"],
     ["Phase", view.phase],
+    ["Score", String(view.score)],
     ["Pieces", String(view.pieceCount)],
     ["Gravity", String(view.gravityInternal)],
     ["Active", view.activePiece?.type ?? "none"],
@@ -274,6 +377,7 @@ function render(view: PresentationView): void {
   drawActivePiece(view);
   drawLineClearRows(view);
   drawPreviews(view);
+  drawUserHud(view);
 
   if (view.phase === "GameOver") {
     context.fillStyle = "rgba(0, 0, 0, 0.65)";
@@ -297,7 +401,9 @@ function render(view: PresentationView): void {
     context.fillText("Press P to resume", BOARD_X + 100, BOARD_Y + 244);
   }
 
-  renderStats(view, isPaused);
+  if (debugMode) {
+    renderStats(view, isPaused);
+  }
 }
 
 function loop(now: number): void {
@@ -315,6 +421,7 @@ function loop(now: number): void {
     const previousState = state;
     state = stepGame(state, buildInputFrame());
     presentationState = updatePresentationState(presentationState, previousState, state);
+    uiAnimationFrames += 1;
     accumulator -= FRAME_MS;
   }
 

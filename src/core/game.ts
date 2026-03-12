@@ -54,26 +54,33 @@ function cloneField(field: Field): Field {
 }
 
 function resolveGravityInternal(pieceCount: number, config: GameConfig): number {
-  let gravity = config.gravityLadder[0].internalGravity;
-
-  for (const tier of config.gravityLadder) {
-    if (pieceCount >= tier.minLockedPieces) {
-      gravity = tier.internalGravity;
-    }
+  if (pieceCount >= config.gravity20GPieceCount) {
+    return config.gravity20GInternal;
   }
 
-  return gravity;
+  const denominator = Math.max(1, config.gravity20GPieceCount - 1);
+  const progress = Math.max(0, Math.min(1, pieceCount / denominator));
+  const gravityStart = config.gravityStartInternal / 256;
+  const gravityMax = config.gravityPre20GMaxInternal / 256;
+  const gravityG =
+    gravityStart + (gravityMax - gravityStart) * Math.pow(progress, config.gravityExponent);
+
+  return Math.round(gravityG * 256);
 }
 
 export function createInitialGameState(options?: {
   seed?: number;
   config?: GameConfig;
   field?: Field;
+  pieceCount?: number;
+  score?: number;
 }): GameState {
   const config = options?.config ?? DEFAULT_CONFIG;
   const initialField = options?.field ? cloneField(options.field) : createEmptyField(config.fieldWidth, config.fieldHeight);
   const randomizer = createRandomizerState(options?.seed ?? 1);
   const queueFill = fillQueue(randomizer, config.queueLength);
+  const pieceCount = options?.pieceCount ?? 0;
+  const score = options?.score ?? 0;
 
   return {
     phase: "ARE",
@@ -81,8 +88,9 @@ export function createInitialGameState(options?: {
     queue: queueFill.pieces,
     randomizer: queueFill.state,
     activePiece: null,
-    pieceCount: 0,
-    gravityInternal: resolveGravityInternal(0, config),
+    pieceCount,
+    score,
+    gravityInternal: resolveGravityInternal(pieceCount, config),
     inputMemory: createInputMemory(),
     areFramesRemaining: config.timings.are,
     lineClearFramesRemaining: 0,
@@ -355,6 +363,31 @@ function collapseField(field: Field, clearedRows: number[]): Field {
   return [...emptyRows, ...remainingRows];
 }
 
+function isFieldEmpty(field: Field): boolean {
+  return field.every((row) => row.every((cell) => cell === null));
+}
+
+const SCORE_BY_LINES: Record<number, number> = {
+  1: 100,
+  2: 300,
+  3: 500,
+  4: 800,
+};
+
+function calculateScoreGain(
+  linesCleared: number,
+  piecesBeforeLock: number,
+  bravo: boolean,
+): number {
+  const baseScore = SCORE_BY_LINES[linesCleared] ?? 0;
+  if (baseScore === 0) {
+    return 0;
+  }
+
+  const scaledScore = Math.floor(baseScore * ((100 + piecesBeforeLock) / 100));
+  return scaledScore * (bravo ? 4 : 1);
+}
+
 function applyGravity(
   piece: ActivePiece,
   field: Field,
@@ -391,6 +424,15 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
   const lockedField = mergePieceIntoField(state.field, piece);
   const pendingClearedRows = detectClearedRows(lockedField);
   const nextPieceCount = state.pieceCount + 1;
+  const collapsedField =
+    pendingClearedRows.length > 0 ? collapseField(lockedField, pendingClearedRows) : lockedField;
+  const nextScore =
+    state.score +
+    calculateScoreGain(
+      pendingClearedRows.length,
+      state.pieceCount,
+      pendingClearedRows.length > 0 && isFieldEmpty(collapsedField),
+    );
 
   if (pendingClearedRows.length > 0) {
     return {
@@ -399,6 +441,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
       field: lockedField,
       activePiece: null,
       pieceCount: nextPieceCount,
+      score: nextScore,
       gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
       lineClearFramesRemaining: state.config.timings.lineClearDelay,
       pendingClearedRows,
@@ -411,6 +454,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
     field: lockedField,
     activePiece: null,
     pieceCount: nextPieceCount,
+    score: nextScore,
     gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
     areFramesRemaining: state.config.timings.are,
     pendingClearedRows: [],

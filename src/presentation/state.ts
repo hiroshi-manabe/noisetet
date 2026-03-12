@@ -139,6 +139,7 @@ function buildView(
     lineClearRows: buildLineClearRows(gameState, config),
     queuePreviews: buildQueuePreviews(gameState, queueSlideFramesRemaining, config),
     pieceCount: gameState.pieceCount,
+    score: gameState.score,
     gravityInternal: gameState.gravityInternal,
     lockDelayRemaining: gameState.activePiece?.lockDelayRemaining ?? null,
     shakeOffset: buildShakeOffset(impactShakeFramesRemaining, config),

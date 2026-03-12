@@ -76,6 +76,7 @@ describe("game state", () => {
     expect(state.phase).toBe("ARE");
     expect(state.activePiece).toBeNull();
     expect(state.pieceCount).toBe(1);
+    expect(state.score).toBe(0);
   });
 
   it("enters LineClear and collapses the field after the delay", () => {
@@ -114,6 +115,7 @@ describe("game state", () => {
 
     expect(state.phase).toBe("LineClear");
     expect(state.pendingClearedRows).toEqual([20]);
+    expect(state.score).toBe(400);
 
     for (let frame = 0; frame < state.config.timings.lineClearDelay; frame += 1) {
       state = stepGame(state);
@@ -126,10 +128,87 @@ describe("game state", () => {
 
   it("uses the custom piece-count gravity ladder", () => {
     expect(getGravityInternalForPieceCount(0)).toBe(4);
-    expect(getGravityInternalForPieceCount(100)).toBe(32);
-    expect(getGravityInternalForPieceCount(400)).toBe(256);
-    expect(getGravityInternalForPieceCount(900)).toBe(5120);
+    expect(getGravityInternalForPieceCount(100)).toBe(55);
+    expect(getGravityInternalForPieceCount(200)).toBe(209);
+    expect(getGravityInternalForPieceCount(400)).toBe(824);
+    expect(getGravityInternalForPieceCount(499)).toBe(1280);
+    expect(getGravityInternalForPieceCount(500)).toBe(5120);
     expect(getGravityInternalForPieceCount(1400)).toBe(5120);
+  });
+
+  it("scales line-clear score by piece count", () => {
+    const field = createEmptyField();
+    field[19][9] = "O";
+    for (let x = 4; x < 10; x += 1) {
+      field[20][x] = "T";
+    }
+
+    let state = createInitialGameState({ seed: 7, field, pieceCount: 100 });
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.score).toBe(200);
+  });
+
+  it("applies the bravo multiplier on an all clear", () => {
+    const field = createEmptyField();
+    for (let x = 4; x < 10; x += 1) {
+      field[20][x] = "T";
+    }
+
+    let state = createInitialGameState({ seed: 7, field });
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.score).toBe(400);
   });
 
   it("moves one cell on a new horizontal press", () => {

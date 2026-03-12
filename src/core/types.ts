@@ -19,11 +19,6 @@ export interface Timings {
   lineClearDelay: number;
 }
 
-export interface GravityTier {
-  minLockedPieces: number;
-  internalGravity: number;
-}
-
 export interface GameConfig {
   fieldWidth: number;
   fieldHeight: number;
@@ -31,7 +26,11 @@ export interface GameConfig {
   previewCount: number;
   softDropInternalGravity: number;
   timings: Timings;
-  gravityLadder: GravityTier[];
+  gravityStartInternal: number;
+  gravityPre20GMaxInternal: number;
+  gravity20GInternal: number;
+  gravity20GPieceCount: number;
+  gravityExponent: number;
 }
 
 export interface ActivePiece {
@@ -73,6 +72,7 @@ export interface GameState {
   randomizer: RandomizerState;
   activePiece: ActivePiece | null;
   pieceCount: number;
+  score: number;
   gravityInternal: number;
   inputMemory: InputMemory;
   areFramesRemaining: number;

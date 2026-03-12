@@ -45,6 +45,7 @@ export interface PresentationView {
   lineClearRows: LineClearRowView[];
   queuePreviews: QueuePreviewItem[];
   pieceCount: number;
+  score: number;
   gravityInternal: number;
   lockDelayRemaining: number | null;
   shakeOffset: ShakeOffset;
