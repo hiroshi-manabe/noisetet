@@ -343,6 +343,7 @@ Rules:
 - `normal` is the user-facing mode and starts unpaused
 - `debug` is non-user-facing and starts paused
 - `debug20g` is non-user-facing and starts paused
+- after a game-over restart, the next run should start unpaused regardless of debug boot mode
 - `debug20g` should initialize directly into `20G` conditions with piece count set to `500`
 - no in-game mode transitions are required
 - debug modes should be entered only through a hidden startup mechanism rather than a visible menu
@@ -432,6 +433,7 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 - create the piece using ARS spawn position and orientation
 - apply stored IRS intent first
 - apply pre-entry lateral intent second
+- if gravity is `20G`, settle the piece immediately to its final resting height before entering `Active`
 - if the resulting spawn state is invalid, transition to `GameOver`
 - otherwise transition to `Active`
 
@@ -440,7 +442,9 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 - the active piece owns type, position, orientation, gravity accumulator, grounded flag, and lock-delay timer
 - below `1G`, gravity uses fractional accumulation
 - at `1G` or more, the piece descends as far as allowed by collision
-- at `20G`, the piece settles instantly to its resting height for that frame but remains active until lock resolves
+- at `20G`, newly spawned pieces should already be settled when `Active` begins
+- at `20G`, there is no airborne traversal phase between spawn and grounded play
+- grounded manipulation still exists after settle and before lock resolves
 - on the first grounded frame, start the lock-delay timer
 - while still grounded, decrement lock delay once per frame
 - if lock delay reaches zero, lock immediately
@@ -464,6 +468,7 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 `GameOver`
 
 - game over occurs only when spawning the next piece fails after allowed spawn-time processing
+- the blocked spawn piece should remain visible even if it overlaps existing stack cells
 
 #### 10.5 Project default timing profile
 
@@ -473,13 +478,15 @@ Default handling delays (frames):
 
 | Parameter | Value |
 | --- | ---: |
-| ARE | 27 |
-| Line ARE | 27 |
+| ARE | 16 |
+| Line ARE | 12 |
 | DAS | 16 |
 | Lock delay | 30 |
-| Line clear delay | 40 |
+| Line clear delay | 12 |
 
 These values stay fixed across the whole game unless explicitly re-tuned later.
+
+This timing profile intentionally pulls the post-lock cadence closer to early TAP Death rhythm while keeping the project-specific progression model and preserving a full 30-frame lock delay.
 
 #### 10.6 Custom gravity progression
 
@@ -602,6 +609,7 @@ Debug HUD:
 - exists only in debug boot modes
 - may show any internal state useful for development
 - is not part of the intended user presentation
+- should include elapsed time since game start in milliseconds
 
 Text rendering requirements:
 

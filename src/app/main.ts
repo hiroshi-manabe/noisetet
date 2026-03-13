@@ -95,6 +95,7 @@ const debugMode = isDebugMode(bootSession.mode);
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
 let isPaused = bootSession.paused;
+let elapsedGameplayMs = 0;
 let uiAnimationFrames = 0;
 let accumulator = 0;
 let previousTime = performance.now();
@@ -133,7 +134,8 @@ window.addEventListener("keydown", (event) => {
   if (state.phase === "GameOver" && event.code === "KeyR") {
     state = createBootSession(bootSession.mode, 7).state;
     presentationState = createPresentationState(state);
-    isPaused = bootSession.paused;
+    isPaused = false;
+    elapsedGameplayMs = 0;
     uiAnimationFrames = 0;
     accumulator = 0;
     pressedKeys.clear();
@@ -353,10 +355,11 @@ function drawUserHud(view: PresentationView): void {
   drawTexturedNumber(view.pieceCount, HUD_PANEL_X + 8, HUD_PANEL_Y + 144);
 }
 
-function renderStats(view: PresentationView, paused: boolean): void {
+function renderStats(view: PresentationView, paused: boolean, elapsedMs: number): void {
   stats.innerHTML = [
     ["Mode", bootSession.mode],
     ["Paused", paused ? "yes" : "no"],
+    ["ElapsedMs", String(Math.floor(elapsedMs))],
     ["Phase", view.phase],
     ["Score", String(view.score)],
     ["Pieces", String(view.pieceCount)],
@@ -406,7 +409,7 @@ function render(view: PresentationView): void {
   }
 
   if (debugMode) {
-    renderStats(view, isPaused);
+    renderStats(view, isPaused, elapsedGameplayMs);
   }
 }
 
@@ -425,6 +428,9 @@ function loop(now: number): void {
     const previousState = state;
     state = stepGame(state, buildInputFrame());
     presentationState = updatePresentationState(presentationState, previousState, state);
+    if (previousState.phase !== "GameOver") {
+      elapsedGameplayMs += FRAME_MS;
+    }
     uiAnimationFrames += 1;
     accumulator -= FRAME_MS;
   }

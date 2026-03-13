@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_TIMINGS,
   createEmptyField,
   createInitialGameState,
   getCellsForPiece,
@@ -25,6 +26,14 @@ describe("game state", () => {
     expect(state.phase).toBe("ARE");
     expect(state.queue).toHaveLength(4);
     expect(state.activePiece).toBeNull();
+  });
+
+  it("uses the tightened fixed handling timings", () => {
+    expect(DEFAULT_TIMINGS.are).toBe(16);
+    expect(DEFAULT_TIMINGS.lineAre).toBe(12);
+    expect(DEFAULT_TIMINGS.das).toBe(16);
+    expect(DEFAULT_TIMINGS.lockDelay).toBe(30);
+    expect(DEFAULT_TIMINGS.lineClearDelay).toBe(12);
   });
 
   it("transitions from ARE to Spawning to Active", () => {
@@ -59,6 +68,8 @@ describe("game state", () => {
     state = stepGame(state);
 
     expect(state.phase).toBe("GameOver");
+    expect(state.activePiece).not.toBeNull();
+    expect(state.activePiece?.type).toBe("T");
   });
 
   it("hard-drops and locks immediately", () => {
@@ -765,21 +776,18 @@ describe("game state", () => {
     expect(state.activePiece?.lockDelayRemaining).toBe(state.config.timings.lockDelay);
   });
 
-  it("applies input before 20G settling", () => {
-    let state = advanceToActiveState();
+  it("applies spawn-time lateral intent before 20G settle", () => {
+    let state = createInitialGameState({ seed: 7, pieceCount: 500 });
+
+    for (let frame = 0; frame < state.config.timings.are; frame += 1) {
+      state = stepGame(state);
+    }
+
+    expect(state.phase).toBe("Spawning");
 
     state = {
       ...state,
-      gravityInternal: 5120,
-      activePiece: {
-        type: "O",
-        rotation: "spawn",
-        x: 3,
-        y: 0,
-        gravityAccumulator: 0,
-        grounded: false,
-        lockDelayRemaining: state.config.timings.lockDelay,
-      },
+      queue: ["T", ...state.queue.slice(1)],
     };
 
     state = stepGame(state, {
@@ -791,7 +799,40 @@ describe("game state", () => {
       down: false,
     });
 
+    expect(state.phase).toBe("Active");
     expect(state.activePiece?.x).toBe(4);
+    expect(state.activePiece?.y).toBe(18);
+    expect(state.activePiece?.grounded).toBe(true);
+  });
+
+  it("allows grounded manipulation after 20G spawn settle", () => {
+    let state = createInitialGameState({ seed: 7, pieceCount: 500 });
+
+    for (let frame = 0; frame < state.config.timings.are; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = {
+      ...state,
+      queue: ["O", ...state.queue.slice(1)],
+    };
+
+    state = stepGame(state);
+
+    expect(state.phase).toBe("Active");
+    expect(state.activePiece?.y).toBe(19);
+    expect(state.activePiece?.grounded).toBe(true);
+
+    state = stepGame(state, {
+      left: false,
+      right: true,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: false,
+    });
+
+    expect(state.activePiece?.x).toBe(5);
     expect(state.activePiece?.y).toBe(19);
     expect(state.activePiece?.grounded).toBe(true);
   });

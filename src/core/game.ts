@@ -496,10 +496,19 @@ function stepSpawningState(state: GameState): GameState {
       phase: "GameOver",
       queue: refilled.queue,
       randomizer: refilled.randomizer,
+      activePiece: piece,
       inputMemory: {
         ...state.inputMemory,
         storedIrs: null,
       },
+    };
+  }
+
+  if (state.gravityInternal >= state.config.gravity20GInternal) {
+    piece = {
+      ...applyGravity(piece, state.field, state.gravityInternal).piece,
+      grounded: true,
+      lockDelayRemaining: state.config.timings.lockDelay,
     };
   }
 

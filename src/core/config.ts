@@ -6,11 +6,11 @@ export const PREVIEW_COUNT = 3;
 export const QUEUE_LENGTH = PREVIEW_COUNT + 1;
 
 export const DEFAULT_TIMINGS: Timings = {
-  are: 27,
-  lineAre: 27,
+  are: 16,
+  lineAre: 12,
   das: 16,
   lockDelay: 30,
-  lineClearDelay: 40,
+  lineClearDelay: 12,
 };
 
 export const DEFAULT_CONFIG: GameConfig = {
