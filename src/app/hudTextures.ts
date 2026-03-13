@@ -1,5 +1,7 @@
 const DIGIT_WIDTH = 22;
 const DIGIT_HEIGHT = 32;
+const LABEL_HEIGHT = 32;
+const LABEL_WIDTH = 110;
 
 function createTextureCanvas(width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -33,18 +35,35 @@ function fillTexturedBackground(
 }
 
 function createLabelTexture(label: string): HTMLCanvasElement {
-  const canvas = createTextureCanvas(94, 24);
+  const canvas = createTextureCanvas(LABEL_WIDTH, LABEL_HEIGHT);
   const context = canvas.getContext("2d");
   if (context === null) {
     throw new Error("Canvas 2D context is unavailable for HUD label texture.");
   }
 
-  fillTexturedBackground(context, canvas.width, canvas.height, "rgba(212, 187, 99, 0.26)");
-  context.fillStyle = "#eef1df";
-  context.font = 'bold 14px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.font = 'bold 24px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(label, canvas.width / 2, Math.floor(canvas.height / 2) + 1);
+
+  const labelY = Math.floor(canvas.height / 2) + 1;
+  context.fillStyle = "#eef1df";
+  context.fillText(label, canvas.width / 2, labelY);
+
+  context.globalCompositeOperation = "source-atop";
+  for (let x = 0; x < canvas.width; x += 4) {
+    context.fillStyle = x % 8 === 0 ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)";
+    context.fillRect(x, 0, 2, canvas.height);
+  }
+
+  context.fillStyle = "rgba(255, 255, 255, 0.16)";
+  context.fillRect(0, 2, canvas.width, 3);
+
+  context.globalCompositeOperation = "screen";
+  context.fillStyle = "rgba(212, 187, 99, 0.22)";
+  context.fillRect(0, 0, canvas.width, Math.max(3, Math.floor(canvas.height * 0.18)));
+
+  context.globalCompositeOperation = "source-over";
   return canvas;
 }
 

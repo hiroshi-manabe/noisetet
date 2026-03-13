@@ -35,6 +35,10 @@ const HUD_PANEL_Y = BOARD_Y + 292;
 const HUD_PANEL_WIDTH = 110;
 const HUD_PANEL_HEIGHT = 212;
 const LABEL_BLINK_FRAMES = 30;
+const SCORE_DISPLAY_DIGITS = 5;
+const SCORE_DISPLAY_MAX = 99999;
+const PIECES_DISPLAY_DIGITS = 3;
+const PIECES_DISPLAY_MAX = 999;
 
 const COLORS: Record<Tetromino, string> = {
   I: "#77f0e3",
@@ -305,36 +309,27 @@ function drawPreviews(view: PresentationView): void {
   });
 }
 
-function drawTexturedNumber(value: number, x: number, y: number): void {
-  const digits = String(Math.max(0, Math.floor(value)));
-  const totalWidth = digits.length * hudTextures.digitWidth;
-  const availableWidth = HUD_PANEL_WIDTH - 16;
-  const scale = totalWidth > availableWidth ? availableWidth / totalWidth : 1;
-  let cursorX = x + Math.floor((availableWidth - totalWidth * scale) / 2);
+function drawTexturedNumber(value: number, x: number, y: number, slots: number, maxValue: number): void {
+  const clampedValue = Math.min(maxValue, Math.max(0, Math.floor(value)));
+  const digits = String(clampedValue);
+  const slotWidth = hudTextures.digitWidth;
+  const totalWidth = slots * slotWidth;
+  let cursorX = x + totalWidth - digits.length * slotWidth;
 
   for (const digit of digits) {
     const texture = hudTextures.digits[digit];
-    context.drawImage(
-      texture,
-      cursorX,
-      y,
-      Math.floor(hudTextures.digitWidth * scale),
-      Math.floor(hudTextures.digitHeight * scale),
-    );
-    cursorX += hudTextures.digitWidth * scale;
+    context.drawImage(texture, cursorX, y, hudTextures.digitWidth, hudTextures.digitHeight);
+    cursorX += slotWidth;
   }
 }
 
-function getBlinkAlpha(): number {
+function shouldDrawBlinkLabel(): boolean {
   const phase = uiAnimationFrames % (LABEL_BLINK_FRAMES * 2);
-  return phase < LABEL_BLINK_FRAMES ? 1 : 0.38;
+  return phase < LABEL_BLINK_FRAMES;
 }
 
-function drawHudLabel(texture: HTMLCanvasElement, x: number, y: number, alpha: number): void {
-  context.save();
-  context.globalAlpha = alpha;
+function drawHudLabel(texture: HTMLCanvasElement, x: number, y: number): void {
   context.drawImage(texture, x, y);
-  context.restore();
 }
 
 function drawUserHud(view: PresentationView): void {
@@ -345,14 +340,25 @@ function drawUserHud(view: PresentationView): void {
   context.lineWidth = 2;
   context.strokeRect(HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
 
-  const blinkAlpha = getBlinkAlpha();
+  const drawBlinkLabel = shouldDrawBlinkLabel();
   const labelX = HUD_PANEL_X + 8;
+  const digitsX = HUD_PANEL_X + 8;
 
-  drawHudLabel(hudTextures.labels.score, labelX, HUD_PANEL_Y + 16, blinkAlpha);
-  drawTexturedNumber(view.score, HUD_PANEL_X + 8, HUD_PANEL_Y + 52);
+  if (drawBlinkLabel) {
+    drawHudLabel(hudTextures.labels.score, labelX, HUD_PANEL_Y + 12);
+  }
+  drawTexturedNumber(view.score, digitsX, HUD_PANEL_Y + 48, SCORE_DISPLAY_DIGITS, SCORE_DISPLAY_MAX);
 
-  drawHudLabel(hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 108, blinkAlpha);
-  drawTexturedNumber(view.pieceCount, HUD_PANEL_X + 8, HUD_PANEL_Y + 144);
+  if (drawBlinkLabel) {
+    drawHudLabel(hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 104);
+  }
+  drawTexturedNumber(
+    view.pieceCount,
+    digitsX + (SCORE_DISPLAY_DIGITS - PIECES_DISPLAY_DIGITS) * hudTextures.digitWidth,
+    HUD_PANEL_Y + 140,
+    PIECES_DISPLAY_DIGITS,
+    PIECES_DISPLAY_MAX,
+  );
 }
 
 function renderStats(view: PresentationView, paused: boolean, elapsedMs: number): void {

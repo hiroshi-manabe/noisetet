@@ -614,9 +614,13 @@ Debug HUD:
 Text rendering requirements:
 
 - `SCORE` and `PIECES` are rendered as textured image assets rather than dynamic text
+- `SCORE` and `PIECES` should be visually scaled to approximately the same height as the numeric digits
 - numeric digits are rendered from textured digit assets rather than font rasterization
-- `SCORE` and `PIECES` should blink
+- `SCORE` and `PIECES` should blink by appearing and disappearing against the panel background rather than by swapping between bright and dark variants
 - numeric values should remain stable and readable rather than blinking
+- the user HUD display caps at `99999` for score and `999` for pieces, but the underlying gameplay state is not capped by that presentation limit
+- score uses a fixed five-digit right-aligned display region
+- pieces uses a fixed three-digit right-aligned display region
 
 ---
 
