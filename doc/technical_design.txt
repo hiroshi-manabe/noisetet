@@ -575,6 +575,7 @@ The renderer should support the following visual structure:
 
 - background layer
 - frame layer
+- playfield surface layer
 - settled field layer
 - active piece layer
 - Next queue layer
@@ -589,6 +590,13 @@ Renderer requirements for piece materials:
 - `O` keeps a fixed material orientation regardless of gameplay rotation state
 
 The renderer should allow theme switching without changing draw order or gameplay behavior.
+
+Frame requirements:
+
+- the playfield frame is a first-class textured role rather than a stroked debug outline
+- the frame is exactly one cell thick on all four sides
+- its outer size is the playfield size plus two cells in both width and height
+- it should be rendered as a textured ring surrounding the playfield
 
 #### 12.1 HUD requirements
 
@@ -705,7 +713,9 @@ These are intentional customizations to the presentation model.
 When an active piece first makes grounded contact:
 
 - the frame should shake
-- the settled stack / playfield image should shake
+- the settled stack should shake
+- the active piece should shake because it still exists at first-contact time
+- the playfield surface and grid should remain fixed so the impact motion stays legible
 - the effect should be short, strong enough to reveal structure, and tunable
 
 If an airborne hard drop locks immediately before a grounded frame can be displayed, it should still trigger the same impact shake.

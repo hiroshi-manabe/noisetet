@@ -28,9 +28,15 @@ const BOARD_X = 32;
 const BOARD_Y = 28;
 const BOARD_WIDTH = FIELD_WIDTH * CELL_SIZE;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE;
+const FRAME_THICKNESS = CELL_SIZE;
+const FRAME_X = BOARD_X - FRAME_THICKNESS;
+const FRAME_Y = BOARD_Y - FRAME_THICKNESS;
+const FRAME_OUTER_WIDTH = BOARD_WIDTH + FRAME_THICKNESS * 2;
+const FRAME_OUTER_HEIGHT = BOARD_HEIGHT + FRAME_THICKNESS * 2;
 const PREVIEW_BOX = 78;
 const FRAME_MS = 1000 / 60;
-const HUD_PANEL_X = BOARD_X + BOARD_WIDTH + 26;
+const SIDE_PANEL_X = FRAME_X + FRAME_OUTER_WIDTH + 12;
+const HUD_PANEL_X = SIDE_PANEL_X;
 const HUD_PANEL_Y = BOARD_Y + 292;
 const HUD_PANEL_WIDTH = 110;
 const HUD_PANEL_HEIGHT = 212;
@@ -80,7 +86,7 @@ if (renderingContext === null) {
 }
 
 const context: CanvasRenderingContext2D = renderingContext;
-const hudTextures = createHudTextures();
+const hudTextures = createHudTextures(CELL_SIZE);
 
 function readBootMode(): BootMode {
   try {
@@ -171,15 +177,11 @@ function drawCell(x: number, y: number, fill: string): void {
 }
 
 function drawBoardGrid(view: PresentationView): void {
-  const originX = BOARD_X + view.shakeOffset.x;
-  const originY = BOARD_Y + view.shakeOffset.y;
+  const originX = BOARD_X;
+  const originY = BOARD_Y;
 
   context.fillStyle = "#131710";
   context.fillRect(originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
-
-  context.strokeStyle = "#4a5540";
-  context.lineWidth = 2;
-  context.strokeRect(originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
 
   context.strokeStyle = "rgba(238, 241, 223, 0.06)";
   context.lineWidth = 1;
@@ -198,6 +200,33 @@ function drawBoardGrid(view: PresentationView): void {
     context.moveTo(originX, gridY);
     context.lineTo(originX + BOARD_WIDTH, gridY);
     context.stroke();
+  }
+}
+
+function drawFrame(view: PresentationView): void {
+  const originX = FRAME_X + view.shakeOffset.x;
+  const originY = FRAME_Y + view.shakeOffset.y;
+
+  for (let x = 0; x < FRAME_OUTER_WIDTH; x += FRAME_THICKNESS) {
+    context.drawImage(hudTextures.frameTile, originX + x, originY, FRAME_THICKNESS, FRAME_THICKNESS);
+    context.drawImage(
+      hudTextures.frameTile,
+      originX + x,
+      originY + FRAME_OUTER_HEIGHT - FRAME_THICKNESS,
+      FRAME_THICKNESS,
+      FRAME_THICKNESS,
+    );
+  }
+
+  for (let y = FRAME_THICKNESS; y < FRAME_OUTER_HEIGHT - FRAME_THICKNESS; y += FRAME_THICKNESS) {
+    context.drawImage(hudTextures.frameTile, originX, originY + y, FRAME_THICKNESS, FRAME_THICKNESS);
+    context.drawImage(
+      hudTextures.frameTile,
+      originX + FRAME_OUTER_WIDTH - FRAME_THICKNESS,
+      originY + y,
+      FRAME_THICKNESS,
+      FRAME_THICKNESS,
+    );
   }
 }
 
@@ -287,18 +316,18 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
 
 function drawPreviews(view: PresentationView): void {
   context.fillStyle = "#192017";
-  context.fillRect(BOARD_X + BOARD_WIDTH + 26, BOARD_Y, 110, 276);
+  context.fillRect(SIDE_PANEL_X, BOARD_Y, 110, 276);
 
   context.strokeStyle = "#4a5540";
   context.lineWidth = 2;
-  context.strokeRect(BOARD_X + BOARD_WIDTH + 26, BOARD_Y, 110, 276);
+  context.strokeRect(SIDE_PANEL_X, BOARD_Y, 110, 276);
 
   context.fillStyle = "#d4bb63";
   context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
-  context.fillText("NEXT", BOARD_X + BOARD_WIDTH + 42, BOARD_Y + 20);
+  context.fillText("NEXT", SIDE_PANEL_X + 16, BOARD_Y + 20);
 
   view.queuePreviews.forEach((preview) => {
-    const boxX = BOARD_X + BOARD_WIDTH + 42;
+    const boxX = SIDE_PANEL_X + 16;
     const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 84;
 
     context.fillStyle = "#0f130f";
@@ -386,6 +415,7 @@ function render(view: PresentationView): void {
   context.fillRect(0, 0, canvas.width, canvas.height);
 
   drawBoardGrid(view);
+  drawFrame(view);
   drawField(view);
   drawActivePiece(view);
   drawLineClearRows(view);

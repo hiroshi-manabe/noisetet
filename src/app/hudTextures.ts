@@ -83,17 +83,39 @@ function createDigitTexture(digit: string): HTMLCanvasElement {
   return canvas;
 }
 
+function createFrameTileTexture(size: number): HTMLCanvasElement {
+  const canvas = createTextureCanvas(size, size);
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("Canvas 2D context is unavailable for frame texture.");
+  }
+
+  fillTexturedBackground(context, canvas.width, canvas.height, "rgba(212, 187, 99, 0.28)");
+  context.strokeStyle = "rgba(238, 241, 223, 0.16)";
+  context.lineWidth = 1;
+  context.strokeRect(1.5, 1.5, canvas.width - 3, canvas.height - 3);
+
+  context.strokeStyle = "rgba(0, 0, 0, 0.28)";
+  context.strokeRect(2.5, 2.5, canvas.width - 5, canvas.height - 5);
+
+  context.fillStyle = "rgba(255, 255, 255, 0.08)";
+  context.fillRect(0, 0, canvas.width, Math.max(2, Math.floor(canvas.height * 0.16)));
+
+  return canvas;
+}
+
 export interface HudTextures {
   labels: {
     score: HTMLCanvasElement;
     pieces: HTMLCanvasElement;
   };
   digits: Record<string, HTMLCanvasElement>;
+  frameTile: HTMLCanvasElement;
   digitWidth: number;
   digitHeight: number;
 }
 
-export function createHudTextures(): HudTextures {
+export function createHudTextures(frameTileSize: number): HudTextures {
   const digits: Record<string, HTMLCanvasElement> = {};
   for (const digit of "0123456789") {
     digits[digit] = createDigitTexture(digit);
@@ -105,6 +127,7 @@ export function createHudTextures(): HudTextures {
       pieces: createLabelTexture("PIECES"),
     },
     digits,
+    frameTile: createFrameTileTexture(frameTileSize),
     digitWidth: DIGIT_WIDTH,
     digitHeight: DIGIT_HEIGHT,
   };
