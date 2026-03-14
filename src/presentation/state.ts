@@ -1,4 +1,5 @@
 import type { Field, GameState, Rotation, Tetromino } from "../core/types.js";
+import { getCellsForPiece } from "../core/index.js";
 import type {
   CellOffsetFloat,
   LineClearRowView,
@@ -84,7 +85,11 @@ function rotationToQuarterTurns(rotation: Rotation): number {
 
 function buildInitialSettledField(field: Field): SettledFieldView {
   return field.map((row) =>
-    row.map((cell) => (cell === null ? null : { type: cell, quarterTurns: 0 })),
+    row.map((cell) =>
+      cell === null
+        ? null
+        : { type: cell, quarterTurns: 0, sourceCellX: 0, sourceCellY: 0 },
+    ),
   );
 }
 
@@ -108,18 +113,55 @@ function mergeLockedPieceIntoSettledField(
 ): SettledFieldView {
   const nextField = cloneSettledField(field);
   const quarterTurns = lockedPiece.type === "O" ? 0 : rotationToQuarterTurns(lockedPiece.rotation);
+  const lockedCells = getCellsForPiece(lockedPiece);
+  const newAbsoluteCells: Array<{ x: number; y: number }> = [];
 
   for (let y = 0; y < gameState.field.length; y += 1) {
     for (let x = 0; x < gameState.field[y].length; x += 1) {
       if (field[y][x] !== null || gameState.field[y][x] !== lockedPiece.type) {
         continue;
       }
-
-      nextField[y][x] = {
-        type: lockedPiece.type,
-        quarterTurns,
-      };
+      newAbsoluteCells.push({ x, y });
     }
+  }
+
+  let inferredOrigin: { x: number; y: number } | null = null;
+  const absoluteCellSet = new Set(newAbsoluteCells.map((cell) => `${cell.x},${cell.y}`));
+
+  for (const absoluteCell of newAbsoluteCells) {
+    for (const localCell of lockedCells) {
+      const candidateOrigin = {
+        x: absoluteCell.x - localCell.x,
+        y: absoluteCell.y - localCell.y,
+      };
+      const matches = lockedCells.every((candidateCell) =>
+        absoluteCellSet.has(
+          `${candidateOrigin.x + candidateCell.x},${candidateOrigin.y + candidateCell.y}`,
+        ),
+      );
+
+      if (matches) {
+        inferredOrigin = candidateOrigin;
+        break;
+      }
+    }
+
+    if (inferredOrigin !== null) {
+      break;
+    }
+  }
+
+  if (inferredOrigin === null) {
+    inferredOrigin = { x: lockedPiece.x, y: lockedPiece.y };
+  }
+
+  for (const absoluteCell of newAbsoluteCells) {
+    nextField[absoluteCell.y][absoluteCell.x] = {
+      type: lockedPiece.type,
+      quarterTurns,
+      sourceCellX: absoluteCell.x - inferredOrigin.x,
+      sourceCellY: absoluteCell.y - inferredOrigin.y,
+    };
   }
 
   return nextField;
@@ -159,10 +201,26 @@ function buildLineClearRows(
     xOffsetCells,
     cells: settledField[rowIndex]
       .map((cell, x) =>
-        cell === null ? null : { x, type: cell.type, quarterTurns: cell.quarterTurns },
+        cell === null
+          ? null
+          : {
+              x,
+              type: cell.type,
+              quarterTurns: cell.quarterTurns,
+              sourceCellX: cell.sourceCellX,
+              sourceCellY: cell.sourceCellY,
+            },
       )
       .filter(
-        (cell): cell is { x: number; type: Tetromino; quarterTurns: number } => cell !== null,
+        (
+          cell,
+        ): cell is {
+          x: number;
+          type: Tetromino;
+          quarterTurns: number;
+          sourceCellX: number;
+          sourceCellY: number;
+        } => cell !== null,
       ),
   }));
 }

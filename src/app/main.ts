@@ -211,17 +211,23 @@ function drawMaterialCell(
   y: number,
   material: TileMaterial,
   quarterTurns: number,
+  sourceCellX: number,
+  sourceCellY: number,
 ): void {
-  if (quarterTurns % 4 === 0 || !material.rotateWithPiece) {
-    context.drawImage(material.texture, x, y, CELL_SIZE, CELL_SIZE);
-    return;
-  }
+  const normalizedQuarterTurns = ((quarterTurns % 4) + 4) % 4;
+  const sourceTexture = material.textures[material.rotateWithPiece ? normalizedQuarterTurns : 0];
 
-  context.save();
-  context.translate(x + CELL_SIZE / 2, y + CELL_SIZE / 2);
-  context.rotate((Math.PI / 2) * quarterTurns);
-  context.drawImage(material.texture, -CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE);
-  context.restore();
+  context.drawImage(
+    sourceTexture,
+    sourceCellX * CELL_SIZE,
+    sourceCellY * CELL_SIZE,
+    CELL_SIZE,
+    CELL_SIZE,
+    x,
+    y,
+    CELL_SIZE,
+    CELL_SIZE,
+  );
 }
 
 function drawBoardGrid(): void {
@@ -272,6 +278,8 @@ function drawField(view: PresentationView): void {
         originY + (y - 1) * CELL_SIZE,
         theme.pieceMaterials[cell.type],
         cell.quarterTurns,
+        cell.sourceCellX,
+        cell.sourceCellY,
       );
     }
   }
@@ -298,6 +306,8 @@ function drawActivePiece(view: PresentationView): void {
       originY + (y - 1 + view.activePieceOffset.y) * CELL_SIZE,
       theme.pieceMaterials[activePiece.type],
       quarterTurns,
+      cell.x,
+      cell.y,
     );
   }
 }
@@ -321,6 +331,8 @@ function drawLineClearRows(view: PresentationView): void {
         originY + (row.y - 1) * CELL_SIZE,
         theme.pieceMaterials[cell.type],
         cell.quarterTurns,
+        cell.sourceCellX,
+        cell.sourceCellY,
       );
     }
   }
@@ -344,7 +356,14 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   const offsetY = y + Math.floor((PREVIEW_BOX - (maxY + 1) * CELL_SIZE) / 2);
 
   for (const cell of cells) {
-    drawMaterialCell(offsetX + cell.x * CELL_SIZE, offsetY + cell.y * CELL_SIZE, theme.pieceMaterials[type], 0);
+    drawMaterialCell(
+      offsetX + cell.x * CELL_SIZE,
+      offsetY + cell.y * CELL_SIZE,
+      theme.pieceMaterials[type],
+      0,
+      cell.x,
+      cell.y,
+    );
   }
 }
 

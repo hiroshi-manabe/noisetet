@@ -27,7 +27,7 @@ export interface ThemeDimensions {
 }
 
 export interface TileMaterial {
-  texture: HTMLCanvasElement;
+  textures: readonly HTMLCanvasElement[];
   rotateWithPiece: boolean;
 }
 
@@ -119,28 +119,64 @@ function createNoiseSurface(width: number, height: number, key: string, base = 1
   return canvas;
 }
 
+function rotateSquareCanvas(source: HTMLCanvasElement, quarterTurns: number): HTMLCanvasElement {
+  const normalizedTurns = ((quarterTurns % 4) + 4) % 4;
+  if (normalizedTurns === 0) {
+    return source;
+  }
+
+  const canvas = createTextureCanvas(source.width, source.height);
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("Canvas 2D context is unavailable for rotated surface.");
+  }
+
+  context.translate(canvas.width / 2, canvas.height / 2);
+  context.rotate((Math.PI / 2) * normalizedTurns);
+  context.drawImage(source, -source.width / 2, -source.height / 2);
+  return canvas;
+}
+
+function createPieceSurfaceVariants(
+  baseSurface: HTMLCanvasElement,
+  rotateWithPiece: boolean,
+): readonly HTMLCanvasElement[] {
+  if (!rotateWithPiece) {
+    return [baseSurface, baseSurface, baseSurface, baseSurface];
+  }
+
+  return [
+    baseSurface,
+    rotateSquareCanvas(baseSurface, 1),
+    rotateSquareCanvas(baseSurface, 2),
+    rotateSquareCanvas(baseSurface, 3),
+  ];
+}
+
 function createSolidPieceTexture(size: number, color: string): HTMLCanvasElement {
-  const canvas = createTextureCanvas(size, size);
+  const canvas = createTextureCanvas(size * 4, size * 4);
   const context = canvas.getContext("2d");
   if (context === null) {
     throw new Error("Canvas 2D context is unavailable for solid piece texture.");
   }
 
-  paintStripedTexture(context, size, size, color, "rgba(255, 255, 255, 0.16)");
+  paintStripedTexture(context, canvas.width, canvas.height, color, "rgba(255, 255, 255, 0.16)");
   context.strokeStyle = "rgba(255, 255, 255, 0.15)";
   context.lineWidth = 1;
-  context.strokeRect(0.5, 0.5, size - 1, size - 1);
   return canvas;
 }
 
 function createNoisePieceTexture(size: number, key: string): HTMLCanvasElement {
-  const canvas = createTextureCanvas(size, size);
+  const canvas = createTextureCanvas(size * 4, size * 4);
   const context = canvas.getContext("2d");
   if (context === null) {
     throw new Error("Canvas 2D context is unavailable for noise piece texture.");
   }
 
-  fillNoiseTexture(context, size, size, seedFromString(key), { base: 132, spread: 56 });
+  fillNoiseTexture(context, canvas.width, canvas.height, seedFromString(key), {
+    base: 132,
+    spread: 56,
+  });
   return canvas;
 }
 
@@ -245,13 +281,55 @@ function createSolidTheme(dimensions: ThemeDimensions): AppTheme {
     showPreviewBoxChrome: true,
     showHudPanelChrome: true,
     pieceMaterials: {
-      I: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.I), rotateWithPiece: true },
-      O: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.O), rotateWithPiece: false },
-      T: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.T), rotateWithPiece: true },
-      S: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.S), rotateWithPiece: true },
-      Z: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.Z), rotateWithPiece: true },
-      J: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.J), rotateWithPiece: true },
-      L: { texture: createSolidPieceTexture(dimensions.frameThickness, solidColors.L), rotateWithPiece: true },
+      I: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.I),
+          true,
+        ),
+        rotateWithPiece: true,
+      },
+      O: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.O),
+          false,
+        ),
+        rotateWithPiece: false,
+      },
+      T: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.T),
+          true,
+        ),
+        rotateWithPiece: true,
+      },
+      S: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.S),
+          true,
+        ),
+        rotateWithPiece: true,
+      },
+      Z: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.Z),
+          true,
+        ),
+        rotateWithPiece: true,
+      },
+      J: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.J),
+          true,
+        ),
+        rotateWithPiece: true,
+      },
+      L: {
+        textures: createPieceSurfaceVariants(
+          createSolidPieceTexture(dimensions.frameThickness, solidColors.L),
+          true,
+        ),
+        rotateWithPiece: true,
+      },
     },
   };
 }
@@ -262,7 +340,10 @@ function createNoiseTheme(dimensions: ThemeDimensions): AppTheme {
     pieceTypes.map((type) => [
       type,
       {
-        texture: createNoisePieceTexture(dimensions.frameThickness, `piece-${type}`),
+        textures: createPieceSurfaceVariants(
+          createNoisePieceTexture(dimensions.frameThickness, `piece-${type}`),
+          type !== "O",
+        ),
         rotateWithPiece: type !== "O",
       },
     ]),

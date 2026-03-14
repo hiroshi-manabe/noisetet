@@ -30,6 +30,8 @@ export interface LineClearCellView {
   x: number;
   type: Tetromino;
   quarterTurns: number;
+  sourceCellX: number;
+  sourceCellY: number;
 }
 
 export interface LineClearRowView {
@@ -41,6 +43,8 @@ export interface LineClearRowView {
 export interface SettledCellView {
   type: Tetromino;
   quarterTurns: number;
+  sourceCellX: number;
+  sourceCellY: number;
 }
 
 export type SettledFieldView = Array<Array<SettledCellView | null>>;

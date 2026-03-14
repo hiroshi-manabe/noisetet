@@ -339,10 +339,14 @@ describe("presentation state", () => {
     expect(presentationState.view.field[18][5]).toEqual({
       type: "T",
       quarterTurns: 1,
+      sourceCellX: 1,
+      sourceCellY: 0,
     });
     expect(presentationState.view.field[19][4]).toEqual({
       type: "T",
       quarterTurns: 1,
+      sourceCellX: 0,
+      sourceCellY: 1,
     });
   });
 
@@ -389,6 +393,8 @@ describe("presentation state", () => {
       x: 5,
       type: "T",
       quarterTurns: 1,
+      sourceCellX: 1,
+      sourceCellY: 2,
     });
   });
 });
