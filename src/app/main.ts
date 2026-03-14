@@ -273,7 +273,12 @@ function drawField(view: PresentationView): void {
         continue;
       }
 
-      drawMaterialCell(originX + x * CELL_SIZE, originY + (y - 1) * CELL_SIZE, theme.pieceMaterials[cell], 0);
+      drawMaterialCell(
+        originX + x * CELL_SIZE,
+        originY + (y - 1) * CELL_SIZE,
+        theme.pieceMaterials[cell.type],
+        cell.quarterTurns,
+      );
     }
   }
 }
@@ -321,7 +326,7 @@ function drawLineClearRows(view: PresentationView): void {
         originX + (cell.x + row.xOffsetCells) * CELL_SIZE,
         originY + (row.y - 1) * CELL_SIZE,
         theme.pieceMaterials[cell.type],
-        0,
+        cell.quarterTurns,
       );
     }
   }

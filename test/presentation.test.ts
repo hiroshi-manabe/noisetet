@@ -51,6 +51,43 @@ function createLineClearState() {
   });
 }
 
+function createLineClearTransition() {
+  const field = createEmptyField();
+  for (let x = 4; x < 10; x += 1) {
+    field[20][x] = "T";
+  }
+
+  let previousState = createInitialGameState({ seed: 7, field });
+
+  for (let frame = 0; frame < previousState.config.timings.are + 1; frame += 1) {
+    previousState = stepGame(previousState);
+  }
+
+  previousState = {
+    ...previousState,
+    activePiece: {
+      type: "I",
+      rotation: "spawn",
+      x: 0,
+      y: 0,
+      gravityAccumulator: 0,
+      grounded: false,
+      lockDelayRemaining: previousState.config.timings.lockDelay,
+    },
+  };
+
+  const currentState = stepGame(previousState, {
+    left: false,
+    right: false,
+    rotateCW: false,
+    rotateCCW: false,
+    up: true,
+    down: false,
+  });
+
+  return { previousState, currentState };
+}
+
 describe("presentation state", () => {
   it("starts with no active presentation animations", () => {
     const gameState = createInitialGameState({ seed: 7 });
@@ -174,8 +211,8 @@ describe("presentation state", () => {
   });
 
   it("builds a sliding overlay for cleared rows during line clear", () => {
-    const previousGameState = advanceToActiveState();
-    const currentGameState = createLineClearState();
+    const { previousState: previousGameState, currentState: currentGameState } =
+      createLineClearTransition();
     let presentationState = createPresentationState(previousGameState);
 
     presentationState = updatePresentationState(presentationState, previousGameState, currentGameState);
@@ -186,6 +223,7 @@ describe("presentation state", () => {
     expect(presentationState.view.lineClearRows[0]?.cells).toHaveLength(10);
     expect(presentationState.view.field[20].every((cell) => cell === null)).toBe(true);
     expect(presentationState.view.lineClearRows[0]?.xOffsetCells).toBe(0);
+    expect(presentationState.view.lineClearRows[0]?.cells[0]?.quarterTurns).toBe(0);
   });
 
   it("advances the cleared-row slide over line-clear frames", () => {
@@ -276,5 +314,81 @@ describe("presentation state", () => {
 
     expect(presentationState.impactShakeFramesRemaining).toBe(0);
     expect(presentationState.view.shakeOffset).toEqual({ x: 0, y: 0 });
+  });
+
+  it("preserves locked piece orientation in the settled field", () => {
+    let previousGameState = advanceToActiveState();
+    previousGameState = {
+      ...previousGameState,
+      activePiece: {
+        type: "T",
+        rotation: "right",
+        x: 4,
+        y: 18,
+        gravityAccumulator: 0,
+        grounded: true,
+        lockDelayRemaining: 1,
+      },
+    };
+
+    let presentationState = createPresentationState(previousGameState);
+    const nextGameState = stepGame(previousGameState);
+    presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+
+    expect(nextGameState.phase).toBe("ARE");
+    expect(presentationState.view.field[18][5]).toEqual({
+      type: "T",
+      quarterTurns: 1,
+    });
+    expect(presentationState.view.field[19][4]).toEqual({
+      type: "T",
+      quarterTurns: 1,
+    });
+  });
+
+  it("keeps locked orientation in the line-clear overlay before collapse", () => {
+    const field = createEmptyField();
+    for (let x = 0; x < 10; x += 1) {
+      if (x !== 5) {
+        field[20][x] = "I";
+      }
+    }
+
+    let previousGameState = createInitialGameState({ seed: 7, field });
+    for (let frame = 0; frame < previousGameState.config.timings.are + 1; frame += 1) {
+      previousGameState = stepGame(previousGameState);
+    }
+
+    previousGameState = {
+      ...previousGameState,
+      activePiece: {
+        type: "T",
+        rotation: "right",
+        x: 4,
+        y: 18,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: previousGameState.config.timings.lockDelay,
+      },
+    };
+
+    let presentationState = createPresentationState(previousGameState);
+    const currentGameState = stepGame(previousGameState, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+    presentationState = updatePresentationState(presentationState, previousGameState, currentGameState);
+
+    expect(currentGameState.phase).toBe("LineClear");
+    const lockedCell = presentationState.view.lineClearRows[0]?.cells.find((cell) => cell.x === 5);
+    expect(lockedCell).toEqual({
+      x: 5,
+      type: "T",
+      quarterTurns: 1,
+    });
   });
 });

@@ -1,4 +1,4 @@
-import type { ActivePiece, Field, GamePhase, Tetromino } from "../core/types.js";
+import type { ActivePiece, GamePhase, Tetromino } from "../core/types.js";
 
 export interface PresentationConfig {
   queueSlideFrames: number;
@@ -29,6 +29,7 @@ export interface QueuePreviewItem {
 export interface LineClearCellView {
   x: number;
   type: Tetromino;
+  quarterTurns: number;
 }
 
 export interface LineClearRowView {
@@ -37,9 +38,16 @@ export interface LineClearRowView {
   cells: LineClearCellView[];
 }
 
+export interface SettledCellView {
+  type: Tetromino;
+  quarterTurns: number;
+}
+
+export type SettledFieldView = Array<Array<SettledCellView | null>>;
+
 export interface PresentationView {
   phase: GamePhase;
-  field: Field;
+  field: SettledFieldView;
   activePiece: ActivePiece | null;
   activePieceOffset: CellOffsetFloat;
   lineClearRows: LineClearRowView[];
@@ -53,6 +61,7 @@ export interface PresentationView {
 
 export interface PresentationState {
   config: PresentationConfig;
+  settledField: SettledFieldView;
   queueSlideFramesRemaining: number;
   impactShakeFramesRemaining: number;
   activePieceMotionFramesRemaining: number;

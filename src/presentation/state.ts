@@ -1,8 +1,10 @@
-import type { Field, GameState, Tetromino } from "../core/types.js";
+import type { Field, GameState, Rotation, Tetromino } from "../core/types.js";
 import type {
   CellOffsetFloat,
   LineClearRowView,
   PresentationConfig,
+  SettledCellView,
+  SettledFieldView,
   PresentationState,
   PresentationView,
   QueuePreviewItem,
@@ -62,12 +64,76 @@ function cloneField(field: Field): Field {
   return field.map((row) => [...row]);
 }
 
-function buildRenderedField(gameState: GameState): Field {
-  if (gameState.phase !== "LineClear" || gameState.pendingClearedRows.length === 0) {
-    return gameState.field;
+function cloneSettledField(field: SettledFieldView): SettledFieldView {
+  return field.map((row) => row.map((cell) => (cell === null ? null : { ...cell })));
+}
+
+function rotationToQuarterTurns(rotation: Rotation): number {
+  switch (rotation) {
+    case "right":
+      return 1;
+    case "reverse":
+      return 2;
+    case "left":
+      return 3;
+    case "spawn":
+    default:
+      return 0;
+  }
+}
+
+function buildInitialSettledField(field: Field): SettledFieldView {
+  return field.map((row) =>
+    row.map((cell) => (cell === null ? null : { type: cell, quarterTurns: 0 })),
+  );
+}
+
+function collapseSettledField(field: SettledFieldView, clearedRows: number[]): SettledFieldView {
+  if (clearedRows.length === 0) {
+    return cloneSettledField(field);
   }
 
-  const renderedField = cloneField(gameState.field);
+  const remainingRows = field.filter((_, index) => !clearedRows.includes(index));
+  const emptyRows = Array.from({ length: clearedRows.length }, () =>
+    Array<SettledCellView | null>(field[0]?.length ?? 0).fill(null),
+  );
+
+  return [...emptyRows, ...remainingRows.map((row) => row.map((cell) => (cell === null ? null : { ...cell })))];
+}
+
+function mergeLockedPieceIntoSettledField(
+  field: SettledFieldView,
+  gameState: GameState,
+  lockedPiece: NonNullable<GameState["activePiece"]>,
+): SettledFieldView {
+  const nextField = cloneSettledField(field);
+  const quarterTurns = lockedPiece.type === "O" ? 0 : rotationToQuarterTurns(lockedPiece.rotation);
+
+  for (let y = 0; y < gameState.field.length; y += 1) {
+    for (let x = 0; x < gameState.field[y].length; x += 1) {
+      if (field[y][x] !== null || gameState.field[y][x] !== lockedPiece.type) {
+        continue;
+      }
+
+      nextField[y][x] = {
+        type: lockedPiece.type,
+        quarterTurns,
+      };
+    }
+  }
+
+  return nextField;
+}
+
+function buildRenderedField(
+  settledField: SettledFieldView,
+  gameState: GameState,
+): SettledFieldView {
+  if (gameState.phase !== "LineClear" || gameState.pendingClearedRows.length === 0) {
+    return settledField;
+  }
+
+  const renderedField = cloneSettledField(settledField);
   for (const rowIndex of gameState.pendingClearedRows) {
     renderedField[rowIndex].fill(null);
   }
@@ -75,6 +141,7 @@ function buildRenderedField(gameState: GameState): Field {
 }
 
 function buildLineClearRows(
+  settledField: SettledFieldView,
   gameState: GameState,
   config: PresentationConfig,
 ): LineClearRowView[] {
@@ -90,9 +157,13 @@ function buildLineClearRows(
   return gameState.pendingClearedRows.map((rowIndex) => ({
     y: rowIndex,
     xOffsetCells,
-    cells: gameState.field[rowIndex]
-      .map((cell, x) => (cell === null ? null : { x, type: cell }))
-      .filter((cell): cell is { x: number; type: Tetromino } => cell !== null),
+    cells: settledField[rowIndex]
+      .map((cell, x) =>
+        cell === null ? null : { x, type: cell.type, quarterTurns: cell.quarterTurns },
+      )
+      .filter(
+        (cell): cell is { x: number; type: Tetromino; quarterTurns: number } => cell !== null,
+      ),
   }));
 }
 
@@ -118,6 +189,7 @@ function buildActivePieceOffset(
 }
 
 function buildView(
+  settledField: SettledFieldView,
   gameState: GameState,
   queueSlideFramesRemaining: number,
   impactShakeFramesRemaining: number,
@@ -128,7 +200,7 @@ function buildView(
 ): PresentationView {
   return {
     phase: gameState.phase,
-    field: buildRenderedField(gameState),
+    field: buildRenderedField(settledField, gameState),
     activePiece: gameState.activePiece,
     activePieceOffset: buildActivePieceOffset(
       activePieceMotionOffset,
@@ -136,7 +208,7 @@ function buildView(
       entryMotionFramesRemaining,
       config,
     ),
-    lineClearRows: buildLineClearRows(gameState, config),
+    lineClearRows: buildLineClearRows(settledField, gameState, config),
     queuePreviews: buildQueuePreviews(gameState, queueSlideFramesRemaining, config),
     pieceCount: gameState.pieceCount,
     score: gameState.score,
@@ -150,15 +222,17 @@ export function createPresentationState(
   gameState: GameState,
   config: PresentationConfig = DEFAULT_PRESENTATION_CONFIG,
 ): PresentationState {
+  const settledField = buildInitialSettledField(gameState.field);
   return {
     config,
+    settledField,
     queueSlideFramesRemaining: 0,
     impactShakeFramesRemaining: 0,
     activePieceMotionFramesRemaining: 0,
     entryMotionFramesRemaining: 0,
     hasTriggeredImpactShakeForCurrentPiece: false,
     activePieceMotionOffset: ZERO_CELL_OFFSET,
-    view: buildView(gameState, 0, 0, ZERO_CELL_OFFSET, 0, 0, config),
+    view: buildView(settledField, gameState, 0, 0, ZERO_CELL_OFFSET, 0, 0, config),
   };
 }
 
@@ -233,8 +307,32 @@ export function updatePresentationState(
         ? previousPresentationState.config.entryMotionFrames
         : Math.max(0, previousPresentationState.entryMotionFramesRemaining - 1);
 
+  const lockedPreviousPiece =
+    previousGameState.activePiece !== null &&
+    currentGameState.activePiece === null &&
+    (currentGameState.phase === "ARE" || currentGameState.phase === "LineClear")
+      ? previousGameState.activePiece
+      : null;
+
+  const settledFieldAfterLock =
+    lockedPreviousPiece === null
+      ? previousPresentationState.settledField
+      : mergeLockedPieceIntoSettledField(
+          previousPresentationState.settledField,
+          currentGameState,
+          lockedPreviousPiece,
+        );
+
+  const settledField =
+    previousGameState.phase === "LineClear" &&
+    currentGameState.phase === "ARE" &&
+    previousGameState.pendingClearedRows.length > 0
+      ? collapseSettledField(settledFieldAfterLock, previousGameState.pendingClearedRows)
+      : settledFieldAfterLock;
+
   return {
     ...previousPresentationState,
+    settledField,
     queueSlideFramesRemaining,
     impactShakeFramesRemaining,
     activePieceMotionFramesRemaining,
@@ -243,6 +341,7 @@ export function updatePresentationState(
       hasTriggeredImpactShakeForCurrentPiece || impactTriggered,
     activePieceMotionOffset,
     view: buildView(
+      settledField,
       currentGameState,
       queueSlideFramesRemaining,
       impactShakeFramesRemaining,
