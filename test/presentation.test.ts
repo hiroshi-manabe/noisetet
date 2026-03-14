@@ -187,7 +187,8 @@ describe("presentation state", () => {
 
     expect(nextGameState.phase).toBe("Active");
     expect(presentationState.impactShakeFramesRemaining).toBeGreaterThan(0);
-    expect(Math.abs(presentationState.view.shakeOffset.x)).toBeGreaterThan(0);
+    expect(presentationState.view.shakeOffset.x).toBe(0);
+    expect(presentationState.view.shakeOffset.y).toBeGreaterThan(0);
   });
 
   it("starts impact shake on airborne hard drop lock", () => {
@@ -207,7 +208,8 @@ describe("presentation state", () => {
     expect(previousGameState.activePiece?.grounded).toBe(false);
     expect(nextGameState.activePiece).toBeNull();
     expect(presentationState.impactShakeFramesRemaining).toBeGreaterThan(0);
-    expect(Math.abs(presentationState.view.shakeOffset.x)).toBeGreaterThan(0);
+    expect(presentationState.view.shakeOffset.x).toBe(0);
+    expect(presentationState.view.shakeOffset.y).toBeGreaterThan(0);
   });
 
   it("builds a sliding overlay for cleared rows during line clear", () => {
@@ -306,12 +308,18 @@ describe("presentation state", () => {
 
     previousGameState = nextGameState;
 
+    let sawUpwardRecovery = false;
+
     for (let frame = 0; frame < presentationState.config.impactShakeFrames; frame += 1) {
       nextGameState = stepGame(previousGameState);
       presentationState = updatePresentationState(presentationState, previousGameState, nextGameState);
+      if (presentationState.view.shakeOffset.y < 0) {
+        sawUpwardRecovery = true;
+      }
       previousGameState = nextGameState;
     }
 
+    expect(sawUpwardRecovery).toBe(true);
     expect(presentationState.impactShakeFramesRemaining).toBe(0);
     expect(presentationState.view.shakeOffset).toEqual({ x: 0, y: 0 });
   });

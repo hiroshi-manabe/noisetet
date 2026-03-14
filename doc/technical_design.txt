@@ -764,6 +764,9 @@ When an active piece first makes grounded contact:
 - the settled stack should shake
 - the active piece should shake because it still exists at first-contact time
 - the playfield surface and grid should remain fixed so the impact motion stays legible
+- the effect should be vertical only; there should be no left-right shake component
+- the motion should be a simple two-phase compression and return: first downward, then upward, then stop
+- the initial downward compression should be stronger than the upward return so it reads as weight rather than generic vibration
 - the effect should be short, strong enough to reveal structure, and tunable
 
 If an airborne hard drop locks immediately before a grounded frame can be displayed, it should still trigger the same impact shake.

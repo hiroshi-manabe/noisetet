@@ -36,12 +36,24 @@ function buildShakeOffset(
     return { x: 0, y: 0 };
   }
 
-  const intensity = framesRemaining / config.impactShakeFrames;
-  const direction = framesRemaining % 2 === 0 ? -1 : 1;
+  const totalFrames = config.impactShakeFrames;
+  const elapsedFrames = totalFrames - framesRemaining;
+  const downwardFrames = Math.max(1, Math.ceil(totalFrames / 2));
+  const upwardFrames = Math.max(1, totalFrames - downwardFrames);
+
+  let y = 0;
+  if (elapsedFrames < downwardFrames) {
+    const phase = elapsedFrames / downwardFrames;
+    y = config.impactShakeAmplitude * (1 - phase);
+  } else {
+    const upwardElapsed = elapsedFrames - downwardFrames;
+    const phase = upwardFrames <= 1 ? 1 : upwardElapsed / (upwardFrames - 1);
+    y = -config.impactShakeAmplitude * 0.45 * (1 - phase);
+  }
 
   return {
-    x: direction * config.impactShakeAmplitude * intensity,
-    y: (direction * config.impactShakeAmplitude * 0.35) * intensity,
+    x: 0,
+    y,
   };
 }
 
