@@ -133,6 +133,8 @@ In noise mode:
 
 - all major visible elements use fixed white-noise materials
 - the noise must be pre-generated and persistent
+- the generated noise should be true binary black/white noise rather than grayscale noise
+- the default generated noise should use display-space grain rather than raw backing pixels; the current target is `1 x 1` CSS-pixel blocks
 - the frame, playfield surface, active piece, and settled field should converge toward the same perceived gray density when static
 - each tetromino material should be generated as one continuous piece surface rather than as four repeated cell patches
 - the `NEXT` helper label should be omitted
@@ -670,7 +672,7 @@ Text rendering requirements:
 - pieces uses a fixed three-digit right-aligned display region
 - HUD textures and frame/panel materials should come from the active theme rather than being hard-coded in the renderer
 - in noise mode, only the label and digit strokes should be drawn over the shared background; the renderer should not draw boxed HUD panels behind them
-- in noise mode, HUD glyphs should use a modestly brighter persistent noise band than the gameplay surfaces so they remain readable at small size without turning into flat white text
+- in noise mode, HUD glyphs should use a higher white-sample probability than the gameplay surfaces so they remain readable at small size without turning into flat solid white text
 
 ---
 
@@ -700,6 +702,9 @@ The noise theme must obey the following design rules:
 
 - all major visible elements are built from fixed white-noise materials
 - the noise is static unless the owning object moves or an explicit animation transforms it
+- the noise should be composed of true black and true white samples rather than intermediate gray values
+- the default grain should be specified in display-space units, currently `1 x 1` CSS-pixel blocks
+- grain should be specified in display-space units rather than raw backing pixels so Retina-vs-non-Retina differences do not redefine the intended look
 - the screen should not devolve into full-frame flicker chaos
 - movement is the primary source of visibility
 - stillness is concealment

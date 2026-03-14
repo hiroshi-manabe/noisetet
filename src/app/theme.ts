@@ -8,6 +8,8 @@ import {
 
 export const THEME_STORAGE_KEY = "noisetet:theme";
 export const THEME_ENV_KEY = "VITE_THEME";
+const NOISE_BLOCK_CSS_PIXELS = 1;
+const TEXTURE_PIXELS_PER_CSS_PIXEL = 1;
 
 export type ThemeName = "solid" | "noise";
 
@@ -127,7 +129,12 @@ function createNoiseSurface(width: number, height: number, key: string, base = 1
     throw new Error("Canvas 2D context is unavailable for noise surface.");
   }
 
-  fillNoiseTexture(context, width, height, seedFromString(key), { base, spread });
+  fillNoiseTexture(context, width, height, seedFromString(key), {
+    binary: true,
+    whiteProbability: 0.5,
+    blockSizeCssPixels: NOISE_BLOCK_CSS_PIXELS,
+    pixelsPerCssPixel: TEXTURE_PIXELS_PER_CSS_PIXEL,
+  });
   return canvas;
 }
 
@@ -186,8 +193,10 @@ function createNoisePieceTexture(size: number, key: string): HTMLCanvasElement {
   }
 
   fillNoiseTexture(context, canvas.width, canvas.height, seedFromString(key), {
-    base: 132,
-    spread: 56,
+    binary: true,
+    whiteProbability: 0.5,
+    blockSizeCssPixels: NOISE_BLOCK_CSS_PIXELS,
+    pixelsPerCssPixel: TEXTURE_PIXELS_PER_CSS_PIXEL,
   });
   return canvas;
 }
@@ -223,8 +232,10 @@ function createNoiseFrameSurface(dimensions: ThemeDimensions): HTMLCanvasElement
   }
 
   fillNoiseTexture(context, canvas.width, canvas.height, seedFromString("frame-noise"), {
-    base: 132,
-    spread: 56,
+    binary: true,
+    whiteProbability: 0.5,
+    blockSizeCssPixels: NOISE_BLOCK_CSS_PIXELS,
+    pixelsPerCssPixel: TEXTURE_PIXELS_PER_CSS_PIXEL,
   });
   context.clearRect(
     dimensions.frameThickness,

@@ -34,22 +34,42 @@ export function fillNoiseTexture(
   height: number,
   seed: number,
   options: {
-    base: number;
-    spread: number;
+    base?: number;
+    spread?: number;
     alpha?: number;
+    blockSizeCssPixels?: number;
+    pixelsPerCssPixel?: number;
+    binary?: boolean;
+    whiteProbability?: number;
   },
 ): void {
   const random = createSeededRandom(seed);
   const image = context.createImageData(width, height);
   const alpha = clampByte((options.alpha ?? 1) * 255);
+  const pixelsPerCssPixel = Math.max(1, options.pixelsPerCssPixel ?? 1);
+  const blockSize = Math.max(
+    1,
+    Math.round((options.blockSizeCssPixels ?? 1) * pixelsPerCssPixel),
+  );
 
-  for (let index = 0; index < image.data.length; index += 4) {
-    const sample = options.base + (random() * 2 - 1) * options.spread;
-    const value = clampByte(sample);
-    image.data[index] = value;
-    image.data[index + 1] = value;
-    image.data[index + 2] = value;
-    image.data[index + 3] = alpha;
+  for (let y = 0; y < height; y += blockSize) {
+    for (let x = 0; x < width; x += blockSize) {
+      const value = options.binary
+        ? random() < (options.whiteProbability ?? 0.5)
+          ? 255
+          : 0
+        : clampByte((options.base ?? 128) + (random() * 2 - 1) * (options.spread ?? 0));
+
+      for (let blockY = 0; blockY < blockSize && y + blockY < height; blockY += 1) {
+        for (let blockX = 0; blockX < blockSize && x + blockX < width; blockX += 1) {
+          const pixelIndex = ((y + blockY) * width + (x + blockX)) * 4;
+          image.data[pixelIndex] = value;
+          image.data[pixelIndex + 1] = value;
+          image.data[pixelIndex + 2] = value;
+          image.data[pixelIndex + 3] = alpha;
+        }
+      }
+    }
   }
 
   context.putImageData(image, 0, 0);

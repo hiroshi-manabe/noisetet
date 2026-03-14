@@ -72,8 +72,10 @@ function createNoiseGlyphTexture(
 
   context.clearRect(0, 0, width, height);
   fillNoiseTexture(context, width, height, seedFromString(seedKey), {
-    base: 164,
-    spread: 40,
+    binary: true,
+    whiteProbability: 0.72,
+    blockSizeCssPixels: 1,
+    pixelsPerCssPixel: 1,
   });
 
   context.globalCompositeOperation = "destination-in";

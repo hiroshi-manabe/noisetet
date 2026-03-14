@@ -84,6 +84,7 @@ if (renderingContext === null) {
 }
 
 const context: CanvasRenderingContext2D = renderingContext;
+context.imageSmoothingEnabled = false;
 
 const themeDimensions: ThemeDimensions = {
   canvasWidth: canvas.width,
