@@ -167,6 +167,8 @@ Rules:
 - a dev-only Vite environment value such as `VITE_THEME` may choose the theme at startup
 - a hidden persisted storage override may still exist as a fallback
 - if both environment and storage are present, the environment value takes precedence
+- in shipped `normal` mode, the game should always boot into the `noise` theme regardless of debug theme overrides
+- hidden theme overrides exist for debug use, not for the normal player-facing boot path
 - theme selection must not alter gameplay state, randomization, or timings
 - in `debug` and `debug20g`, the active theme may be toggled live without resetting gameplay or presentation state
 - because debug modes can toggle theme at runtime, no additional combined startup modes are required
@@ -630,6 +632,13 @@ Frame requirements:
 #### 12.1 HUD requirements
 
 The project should distinguish between a user-facing HUD and a debug HUD.
+
+Application-shell layout requirements:
+
+- the game should use the browser viewport from near the top rather than reserving a title/header strip above the canvas
+- decorative top-level labels such as the game title or current-theme subtitle should not consume vertical play space
+- the primary play shell should be sized so the full game area fits within a browser viewport of roughly 900 usable vertical pixels
+- increasing the cell size for play readability is preferred over preserving non-essential chrome
 
 User-facing HUD:
 

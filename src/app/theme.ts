@@ -74,6 +74,18 @@ export function resolveThemeFromSources(
   return parseThemeName(envValue) ?? parseThemeName(storageValue) ?? "solid";
 }
 
+export function resolveRuntimeTheme(
+  mode: "normal" | "debug" | "debug20g",
+  envValue: string | undefined,
+  storageValue: string | null,
+): ThemeName {
+  if (mode === "normal") {
+    return "noise";
+  }
+
+  return resolveThemeFromSources(envValue, storageValue);
+}
+
 export function getNextTheme(themeName: ThemeName): ThemeName {
   return themeName === "solid" ? "noise" : "solid";
 }

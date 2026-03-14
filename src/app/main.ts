@@ -9,7 +9,7 @@ import {
 import {
   createTheme,
   getNextTheme,
-  resolveThemeFromSources,
+  resolveRuntimeTheme,
   rotationToQuarterTurns,
   THEME_ENV_KEY,
   THEME_STORAGE_KEY,
@@ -33,9 +33,9 @@ import {
 } from "../presentation/index.js";
 
 const VISIBLE_ROWS = FIELD_HEIGHT - 1;
-const CELL_SIZE = 24;
-const BOARD_X = 32;
-const BOARD_Y = 28;
+const CELL_SIZE = 30;
+const BOARD_X = 36;
+const BOARD_Y = 30;
 const BOARD_WIDTH = FIELD_WIDTH * CELL_SIZE;
 const BOARD_HEIGHT = VISIBLE_ROWS * CELL_SIZE;
 const FRAME_THICKNESS = CELL_SIZE;
@@ -43,12 +43,14 @@ const FRAME_X = BOARD_X - FRAME_THICKNESS;
 const FRAME_Y = BOARD_Y - FRAME_THICKNESS;
 const FRAME_OUTER_WIDTH = BOARD_WIDTH + FRAME_THICKNESS * 2;
 const FRAME_OUTER_HEIGHT = BOARD_HEIGHT + FRAME_THICKNESS * 2;
-const PREVIEW_BOX = 78;
+const PREVIEW_BOX = 96;
 const FRAME_MS = 1000 / 60;
-const SIDE_PANEL_X = FRAME_X + FRAME_OUTER_WIDTH + 12;
+const PREVIEW_PANEL_WIDTH = 128;
+const PREVIEW_PANEL_HEIGHT = 358;
+const SIDE_PANEL_X = FRAME_X + FRAME_OUTER_WIDTH + 16;
 const HUD_PANEL_X = SIDE_PANEL_X;
-const HUD_PANEL_Y = BOARD_Y + 292;
-const HUD_PANEL_WIDTH = 110;
+const HUD_PANEL_Y = BOARD_Y + PREVIEW_PANEL_HEIGHT + 12;
+const HUD_PANEL_WIDTH = PREVIEW_PANEL_WIDTH;
 const HUD_PANEL_HEIGHT = 212;
 const SCORE_DISPLAY_DIGITS = 5;
 const SCORE_DISPLAY_MAX = 99999;
@@ -59,14 +61,12 @@ const pressedKeys = new Set<string>();
 
 const shellElement = document.querySelector<HTMLElement>("#shell");
 const sidebarElement = document.querySelector<HTMLElement>("#sidebar");
-const subtitleElement = document.querySelector<HTMLElement>("#subtitle");
 const canvasElement = document.querySelector<HTMLCanvasElement>("#game");
 const statsElement = document.querySelector<HTMLDivElement>("#stats");
 
 if (
   shellElement === null ||
   sidebarElement === null ||
-  subtitleElement === null ||
   canvasElement === null ||
   statsElement === null
 ) {
@@ -75,7 +75,6 @@ if (
 
 const shell: HTMLElement = shellElement;
 const sidebar: HTMLElement = sidebarElement;
-const subtitle: HTMLElement = subtitleElement;
 const canvas: HTMLCanvasElement = canvasElement;
 const stats: HTMLDivElement = statsElement;
 
@@ -93,8 +92,8 @@ const themeDimensions: ThemeDimensions = {
   boardHeight: BOARD_HEIGHT,
   frameOuterWidth: FRAME_OUTER_WIDTH,
   frameOuterHeight: FRAME_OUTER_HEIGHT,
-  previewPanelWidth: 110,
-  previewPanelHeight: 276,
+  previewPanelWidth: PREVIEW_PANEL_WIDTH,
+  previewPanelHeight: PREVIEW_PANEL_HEIGHT,
   previewBoxSize: PREVIEW_BOX,
   hudPanelWidth: HUD_PANEL_WIDTH,
   hudPanelHeight: HUD_PANEL_HEIGHT,
@@ -114,7 +113,8 @@ function readBootMode(): BootMode {
 
 function readTheme(): AppTheme["name"] {
   try {
-    return resolveThemeFromSources(
+    return resolveRuntimeTheme(
+      bootSession.mode,
       import.meta.env[THEME_ENV_KEY],
       window.localStorage.getItem(THEME_STORAGE_KEY),
     );
@@ -138,25 +138,13 @@ let previousTime = performance.now();
 if (!debugMode) {
   sidebar.style.display = "none";
   shell.style.gridTemplateColumns = "1fr";
-  shell.style.width = "min(700px, calc(100vw - 32px))";
-}
-
-function updateSubtitle(): void {
-  subtitle.textContent =
-    bootSession.mode === "normal"
-      ? `${theme.displayName} Prototype`
-      : bootSession.mode === "debug20g"
-        ? `${theme.displayName} Debug 20G`
-        : `${theme.displayName} Debug`;
+  shell.style.width = "min(552px, calc(100vw - 16px))";
 }
 
 function applyTheme(nextThemeName: AppTheme["name"]): void {
   themeName = nextThemeName;
   theme = createTheme(themeName, themeDimensions);
-  updateSubtitle();
 }
-
-updateSubtitle();
 
 window.addEventListener("keydown", (event) => {
   if (
@@ -375,8 +363,8 @@ function drawPreviews(view: PresentationView): void {
     context.strokeRect(
       SIDE_PANEL_X + 0.5,
       BOARD_Y + 0.5,
-      themeDimensions.previewPanelWidth - 1,
-      themeDimensions.previewPanelHeight - 1,
+      PREVIEW_PANEL_WIDTH - 1,
+      PREVIEW_PANEL_HEIGHT - 1,
     );
   }
 
@@ -388,7 +376,7 @@ function drawPreviews(view: PresentationView): void {
 
   view.queuePreviews.forEach((preview) => {
     const boxX = SIDE_PANEL_X + 16;
-    const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 84;
+    const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 108;
 
     if (theme.showPreviewBoxChrome) {
       context.drawImage(theme.previewBoxSurface, boxX, boxY);

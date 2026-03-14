@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   getNextTheme,
+  resolveRuntimeTheme,
   resolveTheme,
   resolveThemeFromSources,
   rotationToQuarterTurns,
@@ -16,6 +17,16 @@ describe("theme selection", () => {
   it("prefers env-configured theme over storage", () => {
     expect(resolveThemeFromSources("noise", "solid")).toBe("noise");
     expect(resolveThemeFromSources(undefined, "noise")).toBe("noise");
+  });
+
+  it("forces noise theme in normal mode", () => {
+    expect(resolveRuntimeTheme("normal", "solid", "solid")).toBe("noise");
+    expect(resolveRuntimeTheme("normal", undefined, null)).toBe("noise");
+  });
+
+  it("keeps theme overrides available in debug modes", () => {
+    expect(resolveRuntimeTheme("debug", "solid", "noise")).toBe("solid");
+    expect(resolveRuntimeTheme("debug20g", undefined, "noise")).toBe("noise");
   });
 
   it("accepts explicit theme names", () => {
