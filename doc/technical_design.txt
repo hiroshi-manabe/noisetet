@@ -148,6 +148,18 @@ Switching themes must not alter:
 
 If gameplay changes when the theme changes, the architecture has failed.
 
+#### 6.5 Theme selection during development
+
+Theme selection is a development concern, not a gameplay mode.
+
+Rules:
+
+- the application should support hidden theme selection between `solid` and `noise`
+- a dev-only Vite environment value such as `VITE_THEME` may choose the theme at startup
+- a hidden persisted storage override may still exist as a fallback
+- if both environment and storage are present, the environment value takes precedence
+- theme selection must not alter gameplay state, randomization, or timings
+
 ---
 
 ### 7. Material Model
@@ -586,6 +598,8 @@ The renderer should support the following visual structure:
 - line-clear temporary layer
 - shake transform applied at the appropriate visual scope
 
+The same renderer structure should be used for both themes. Theme switching should only replace owned materials and textures.
+
 Renderer requirements for piece materials:
 
 - non-`O` pieces apply piece rotation to their material when drawn
@@ -632,6 +646,7 @@ Text rendering requirements:
 - the user HUD display caps at `99999` for score and `999` for pieces, but the underlying gameplay state is not capped by that presentation limit
 - score uses a fixed five-digit right-aligned display region
 - pieces uses a fixed three-digit right-aligned display region
+- HUD textures and frame/panel materials should come from the active theme rather than being hard-coded in the renderer
 
 ---
 
@@ -685,6 +700,8 @@ Its purposes are:
 The solid theme should use the same rendering pipeline, the same animation logic, and the same role structure as the noise theme.
 
 It should differ only in assigned materials.
+
+In the current implementation direction, the solid theme should also use generated persistent textures so that the renderer architecture stays aligned with the final noise mode.
 
 ---
 

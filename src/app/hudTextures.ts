@@ -1,14 +1,11 @@
+import { createTextureCanvas, fillNoiseTexture, seedFromString } from "./textureUtils.js";
+
 const DIGIT_WIDTH = 22;
 const DIGIT_HEIGHT = 32;
 const LABEL_HEIGHT = 32;
 const LABEL_WIDTH = 110;
 
-function createTextureCanvas(width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
+export type HudTextureMode = "solid" | "noise";
 
 function fillTexturedBackground(
   context: CanvasRenderingContext2D,
@@ -34,7 +31,7 @@ function fillTexturedBackground(
   context.globalCompositeOperation = "source-over";
 }
 
-function createLabelTexture(label: string): HTMLCanvasElement {
+function createSolidLabelTexture(label: string): HTMLCanvasElement {
   const canvas = createTextureCanvas(LABEL_WIDTH, LABEL_HEIGHT);
   const context = canvas.getContext("2d");
   if (context === null) {
@@ -67,7 +64,62 @@ function createLabelTexture(label: string): HTMLCanvasElement {
   return canvas;
 }
 
-function createDigitTexture(digit: string): HTMLCanvasElement {
+function createNoiseGlyphTexture(
+  text: string,
+  width: number,
+  height: number,
+  font: string,
+  seedKey: string,
+): HTMLCanvasElement {
+  const canvas = createTextureCanvas(width, height);
+  const context = canvas.getContext("2d");
+  if (context === null) {
+    throw new Error("Canvas 2D context is unavailable for HUD glyph texture.");
+  }
+
+  context.clearRect(0, 0, width, height);
+  context.font = font;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillStyle = "#f2f5eb";
+  context.fillText(text, width / 2, Math.floor(height / 2) + 1);
+
+  context.globalCompositeOperation = "source-atop";
+  fillNoiseTexture(context, width, height, seedFromString(seedKey), {
+    base: 196,
+    spread: 72,
+  });
+  context.fillStyle = "rgba(255, 255, 255, 0.12)";
+  context.fillRect(0, 0, width, Math.max(2, Math.floor(height * 0.16)));
+  context.globalCompositeOperation = "source-over";
+  return canvas;
+}
+
+function createLabelTexture(label: string, mode: HudTextureMode): HTMLCanvasElement {
+  if (mode === "noise") {
+    return createNoiseGlyphTexture(
+      label,
+      LABEL_WIDTH,
+      LABEL_HEIGHT,
+      'bold 24px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace',
+      `hud-label-${label}`,
+    );
+  }
+
+  return createSolidLabelTexture(label);
+}
+
+function createDigitTexture(digit: string, mode: HudTextureMode): HTMLCanvasElement {
+  if (mode === "noise") {
+    return createNoiseGlyphTexture(
+      digit,
+      DIGIT_WIDTH,
+      DIGIT_HEIGHT,
+      'bold 24px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace',
+      `hud-digit-${digit}`,
+    );
+  }
+
   const canvas = createTextureCanvas(DIGIT_WIDTH, DIGIT_HEIGHT);
   const context = canvas.getContext("2d");
   if (context === null) {
@@ -83,51 +135,28 @@ function createDigitTexture(digit: string): HTMLCanvasElement {
   return canvas;
 }
 
-function createFrameTileTexture(size: number): HTMLCanvasElement {
-  const canvas = createTextureCanvas(size, size);
-  const context = canvas.getContext("2d");
-  if (context === null) {
-    throw new Error("Canvas 2D context is unavailable for frame texture.");
-  }
-
-  fillTexturedBackground(context, canvas.width, canvas.height, "rgba(212, 187, 99, 0.28)");
-  context.strokeStyle = "rgba(238, 241, 223, 0.16)";
-  context.lineWidth = 1;
-  context.strokeRect(1.5, 1.5, canvas.width - 3, canvas.height - 3);
-
-  context.strokeStyle = "rgba(0, 0, 0, 0.28)";
-  context.strokeRect(2.5, 2.5, canvas.width - 5, canvas.height - 5);
-
-  context.fillStyle = "rgba(255, 255, 255, 0.08)";
-  context.fillRect(0, 0, canvas.width, Math.max(2, Math.floor(canvas.height * 0.16)));
-
-  return canvas;
-}
-
 export interface HudTextures {
   labels: {
     score: HTMLCanvasElement;
     pieces: HTMLCanvasElement;
   };
   digits: Record<string, HTMLCanvasElement>;
-  frameTile: HTMLCanvasElement;
   digitWidth: number;
   digitHeight: number;
 }
 
-export function createHudTextures(frameTileSize: number): HudTextures {
+export function createHudTextures(mode: HudTextureMode): HudTextures {
   const digits: Record<string, HTMLCanvasElement> = {};
   for (const digit of "0123456789") {
-    digits[digit] = createDigitTexture(digit);
+    digits[digit] = createDigitTexture(digit, mode);
   }
 
   return {
     labels: {
-      score: createLabelTexture("SCORE"),
-      pieces: createLabelTexture("PIECES"),
+      score: createLabelTexture("SCORE", mode),
+      pieces: createLabelTexture("PIECES", mode),
     },
     digits,
-    frameTile: createFrameTileTexture(frameTileSize),
     digitWidth: DIGIT_WIDTH,
     digitHeight: DIGIT_HEIGHT,
   };

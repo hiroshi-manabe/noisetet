@@ -6,7 +6,15 @@ import {
   type InputFrame,
   type Tetromino,
 } from "../core/index.js";
-import { createHudTextures } from "./hudTextures.js";
+import {
+  createTheme,
+  resolveThemeFromSources,
+  rotationToQuarterTurns,
+  THEME_ENV_KEY,
+  THEME_STORAGE_KEY,
+  type AppTheme,
+  type TileMaterial,
+} from "./theme.js";
 import {
   BOOT_MODE_ENV_KEY,
   BOOT_MODE_STORAGE_KEY,
@@ -46,16 +54,6 @@ const SCORE_DISPLAY_MAX = 99999;
 const PIECES_DISPLAY_DIGITS = 3;
 const PIECES_DISPLAY_MAX = 999;
 
-const COLORS: Record<Tetromino, string> = {
-  I: "#77f0e3",
-  O: "#f3dc6b",
-  T: "#cc91f5",
-  S: "#92d56f",
-  Z: "#f17e78",
-  J: "#6f97ed",
-  L: "#f2ae5b",
-};
-
 const pressedKeys = new Set<string>();
 
 const shellElement = document.querySelector<HTMLElement>("#shell");
@@ -86,7 +84,6 @@ if (renderingContext === null) {
 }
 
 const context: CanvasRenderingContext2D = renderingContext;
-const hudTextures = createHudTextures(CELL_SIZE);
 
 function readBootMode(): BootMode {
   try {
@@ -99,8 +96,20 @@ function readBootMode(): BootMode {
   }
 }
 
+function readTheme(): AppTheme["name"] {
+  try {
+    return resolveThemeFromSources(
+      import.meta.env[THEME_ENV_KEY],
+      window.localStorage.getItem(THEME_STORAGE_KEY),
+    );
+  } catch {
+    return "solid";
+  }
+}
+
 const bootSession = createBootSession(readBootMode());
 const debugMode = isDebugMode(bootSession.mode);
+const theme = createTheme(readTheme(), CELL_SIZE);
 
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
@@ -118,10 +127,10 @@ if (!debugMode) {
 
 subtitle.textContent =
   bootSession.mode === "normal"
-    ? "Solid Theme Prototype"
+    ? `${theme.displayName} Prototype`
     : bootSession.mode === "debug20g"
-      ? "Solid Theme Debug 20G"
-      : "Solid Theme Debug";
+      ? `${theme.displayName} Debug 20G`
+      : `${theme.displayName} Debug`;
 
 window.addEventListener("keydown", (event) => {
   if (
@@ -167,23 +176,46 @@ function buildInputFrame(): InputFrame {
   };
 }
 
-function drawCell(x: number, y: number, fill: string): void {
-  context.fillStyle = fill;
-  context.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+function fillTiledTexture(texture: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
+  context.save();
+  context.beginPath();
+  context.rect(x, y, width, height);
+  context.clip();
 
-  context.strokeStyle = "rgba(238, 241, 223, 0.1)";
-  context.lineWidth = 1;
-  context.strokeRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+  for (let drawY = y; drawY < y + height; drawY += texture.height) {
+    for (let drawX = x; drawX < x + width; drawX += texture.width) {
+      context.drawImage(texture, drawX, drawY);
+    }
+  }
+
+  context.restore();
 }
 
-function drawBoardGrid(view: PresentationView): void {
+function drawMaterialCell(
+  x: number,
+  y: number,
+  material: TileMaterial,
+  quarterTurns: number,
+): void {
+  if (quarterTurns % 4 === 0 || !material.rotateWithPiece) {
+    context.drawImage(material.texture, x, y, CELL_SIZE, CELL_SIZE);
+    return;
+  }
+
+  context.save();
+  context.translate(x + CELL_SIZE / 2, y + CELL_SIZE / 2);
+  context.rotate((Math.PI / 2) * quarterTurns);
+  context.drawImage(material.texture, -CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE);
+  context.restore();
+}
+
+function drawBoardGrid(): void {
   const originX = BOARD_X;
   const originY = BOARD_Y;
 
-  context.fillStyle = "#131710";
-  context.fillRect(originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
+  fillTiledTexture(theme.boardSurfaceTexture, originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
 
-  context.strokeStyle = "rgba(238, 241, 223, 0.06)";
+  context.strokeStyle = theme.gridStroke;
   context.lineWidth = 1;
 
   for (let x = 1; x < FIELD_WIDTH; x += 1) {
@@ -208,9 +240,9 @@ function drawFrame(view: PresentationView): void {
   const originY = FRAME_Y + view.shakeOffset.y;
 
   for (let x = 0; x < FRAME_OUTER_WIDTH; x += FRAME_THICKNESS) {
-    context.drawImage(hudTextures.frameTile, originX + x, originY, FRAME_THICKNESS, FRAME_THICKNESS);
+    context.drawImage(theme.frameTile, originX + x, originY, FRAME_THICKNESS, FRAME_THICKNESS);
     context.drawImage(
-      hudTextures.frameTile,
+      theme.frameTile,
       originX + x,
       originY + FRAME_OUTER_HEIGHT - FRAME_THICKNESS,
       FRAME_THICKNESS,
@@ -219,9 +251,9 @@ function drawFrame(view: PresentationView): void {
   }
 
   for (let y = FRAME_THICKNESS; y < FRAME_OUTER_HEIGHT - FRAME_THICKNESS; y += FRAME_THICKNESS) {
-    context.drawImage(hudTextures.frameTile, originX, originY + y, FRAME_THICKNESS, FRAME_THICKNESS);
+    context.drawImage(theme.frameTile, originX, originY + y, FRAME_THICKNESS, FRAME_THICKNESS);
     context.drawImage(
-      hudTextures.frameTile,
+      theme.frameTile,
       originX + FRAME_OUTER_WIDTH - FRAME_THICKNESS,
       originY + y,
       FRAME_THICKNESS,
@@ -241,7 +273,7 @@ function drawField(view: PresentationView): void {
         continue;
       }
 
-      drawCell(originX + x * CELL_SIZE, originY + (y - 1) * CELL_SIZE, COLORS[cell]);
+      drawMaterialCell(originX + x * CELL_SIZE, originY + (y - 1) * CELL_SIZE, theme.pieceMaterials[cell], 0);
     }
   }
 }
@@ -254,6 +286,7 @@ function drawActivePiece(view: PresentationView): void {
 
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
+  const quarterTurns = rotationToQuarterTurns(activePiece.rotation);
 
   for (const cell of getCellsForPiece(activePiece)) {
     const y = activePiece.y + cell.y;
@@ -261,10 +294,11 @@ function drawActivePiece(view: PresentationView): void {
       continue;
     }
 
-    drawCell(
+    drawMaterialCell(
       originX + (activePiece.x + cell.x + view.activePieceOffset.x) * CELL_SIZE,
       originY + (y - 1 + view.activePieceOffset.y) * CELL_SIZE,
-      COLORS[activePiece.type],
+      theme.pieceMaterials[activePiece.type],
+      quarterTurns,
     );
   }
 }
@@ -283,10 +317,11 @@ function drawLineClearRows(view: PresentationView): void {
     }
 
     for (const cell of row.cells) {
-      drawCell(
+      drawMaterialCell(
         originX + (cell.x + row.xOffsetCells) * CELL_SIZE,
         originY + (row.y - 1) * CELL_SIZE,
-        COLORS[cell.type],
+        theme.pieceMaterials[cell.type],
+        0,
       );
     }
   }
@@ -310,19 +345,18 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   const offsetY = y + Math.floor((PREVIEW_BOX - (maxY + 1) * CELL_SIZE) / 2);
 
   for (const cell of cells) {
-    drawCell(offsetX + cell.x * CELL_SIZE, offsetY + cell.y * CELL_SIZE, COLORS[type]);
+    drawMaterialCell(offsetX + cell.x * CELL_SIZE, offsetY + cell.y * CELL_SIZE, theme.pieceMaterials[type], 0);
   }
 }
 
 function drawPreviews(view: PresentationView): void {
-  context.fillStyle = "#192017";
-  context.fillRect(SIDE_PANEL_X, BOARD_Y, 110, 276);
+  fillTiledTexture(theme.panelTexture, SIDE_PANEL_X, BOARD_Y, 110, 276);
 
-  context.strokeStyle = "#4a5540";
+  context.strokeStyle = theme.panelStroke;
   context.lineWidth = 2;
   context.strokeRect(SIDE_PANEL_X, BOARD_Y, 110, 276);
 
-  context.fillStyle = "#d4bb63";
+  context.fillStyle = theme.nextLabelColor;
   context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
   context.fillText("NEXT", SIDE_PANEL_X + 16, BOARD_Y + 20);
 
@@ -330,9 +364,8 @@ function drawPreviews(view: PresentationView): void {
     const boxX = SIDE_PANEL_X + 16;
     const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 84;
 
-    context.fillStyle = "#0f130f";
-    context.fillRect(boxX, boxY, PREVIEW_BOX, PREVIEW_BOX);
-    context.strokeStyle = "rgba(238, 241, 223, 0.12)";
+    fillTiledTexture(theme.previewBoxTexture, boxX, boxY, PREVIEW_BOX, PREVIEW_BOX);
+    context.strokeStyle = theme.previewBoxStroke;
     context.strokeRect(boxX + 0.5, boxY + 0.5, PREVIEW_BOX - 1, PREVIEW_BOX - 1);
     drawPreviewPiece(preview.type, boxX, boxY);
   });
@@ -341,13 +374,13 @@ function drawPreviews(view: PresentationView): void {
 function drawTexturedNumber(value: number, x: number, y: number, slots: number, maxValue: number): void {
   const clampedValue = Math.min(maxValue, Math.max(0, Math.floor(value)));
   const digits = String(clampedValue);
-  const slotWidth = hudTextures.digitWidth;
+  const slotWidth = theme.hudTextures.digitWidth;
   const totalWidth = slots * slotWidth;
   let cursorX = x + totalWidth - digits.length * slotWidth;
 
   for (const digit of digits) {
-    const texture = hudTextures.digits[digit];
-    context.drawImage(texture, cursorX, y, hudTextures.digitWidth, hudTextures.digitHeight);
+    const texture = theme.hudTextures.digits[digit];
+    context.drawImage(texture, cursorX, y, theme.hudTextures.digitWidth, theme.hudTextures.digitHeight);
     cursorX += slotWidth;
   }
 }
@@ -362,10 +395,9 @@ function drawHudLabel(texture: HTMLCanvasElement, x: number, y: number): void {
 }
 
 function drawUserHud(view: PresentationView): void {
-  context.fillStyle = "#192017";
-  context.fillRect(HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
+  fillTiledTexture(theme.panelTexture, HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
 
-  context.strokeStyle = "#4a5540";
+  context.strokeStyle = theme.panelStroke;
   context.lineWidth = 2;
   context.strokeRect(HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
 
@@ -374,16 +406,16 @@ function drawUserHud(view: PresentationView): void {
   const digitsX = HUD_PANEL_X + 8;
 
   if (drawBlinkLabel) {
-    drawHudLabel(hudTextures.labels.score, labelX, HUD_PANEL_Y + 12);
+    drawHudLabel(theme.hudTextures.labels.score, labelX, HUD_PANEL_Y + 12);
   }
   drawTexturedNumber(view.score, digitsX, HUD_PANEL_Y + 48, SCORE_DISPLAY_DIGITS, SCORE_DISPLAY_MAX);
 
   if (drawBlinkLabel) {
-    drawHudLabel(hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 104);
+    drawHudLabel(theme.hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 104);
   }
   drawTexturedNumber(
     view.pieceCount,
-    digitsX + (SCORE_DISPLAY_DIGITS - PIECES_DISPLAY_DIGITS) * hudTextures.digitWidth,
+    digitsX + (SCORE_DISPLAY_DIGITS - PIECES_DISPLAY_DIGITS) * theme.hudTextures.digitWidth,
     HUD_PANEL_Y + 140,
     PIECES_DISPLAY_DIGITS,
     PIECES_DISPLAY_MAX,
@@ -393,6 +425,7 @@ function drawUserHud(view: PresentationView): void {
 function renderStats(view: PresentationView, paused: boolean, elapsedMs: number): void {
   stats.innerHTML = [
     ["Mode", bootSession.mode],
+    ["Theme", theme.name],
     ["Paused", paused ? "yes" : "no"],
     ["ElapsedMs", String(Math.floor(elapsedMs))],
     ["Phase", view.phase],
@@ -411,10 +444,9 @@ function renderStats(view: PresentationView, paused: boolean, elapsedMs: number)
 
 function render(view: PresentationView): void {
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#10120e";
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  fillTiledTexture(theme.backgroundTexture, 0, 0, canvas.width, canvas.height);
 
-  drawBoardGrid(view);
+  drawBoardGrid();
   drawFrame(view);
   drawField(view);
   drawActivePiece(view);
@@ -423,23 +455,23 @@ function render(view: PresentationView): void {
   drawUserHud(view);
 
   if (view.phase === "GameOver") {
-    context.fillStyle = "rgba(0, 0, 0, 0.65)";
+    context.fillStyle = theme.overlayFill;
     context.fillRect(BOARD_X, BOARD_Y + 180, BOARD_WIDTH, 96);
-    context.fillStyle = "#eef1df";
+    context.fillStyle = theme.overlayText;
     context.font = '18px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
     context.fillText("GAME OVER", BOARD_X + 110, BOARD_Y + 218);
-    context.fillStyle = "#a9b09b";
+    context.fillStyle = theme.overlayMuted;
     context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
     context.fillText("Press R to restart", BOARD_X + 104, BOARD_Y + 244);
   }
 
   if (isPaused) {
-    context.fillStyle = "rgba(0, 0, 0, 0.65)";
+    context.fillStyle = theme.overlayFill;
     context.fillRect(BOARD_X, BOARD_Y + 180, BOARD_WIDTH, 96);
-    context.fillStyle = "#eef1df";
+    context.fillStyle = theme.overlayText;
     context.font = '18px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
     context.fillText("PAUSED", BOARD_X + 132, BOARD_Y + 218);
-    context.fillStyle = "#a9b09b";
+    context.fillStyle = theme.overlayMuted;
     context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
     context.fillText("Press P to resume", BOARD_X + 100, BOARD_Y + 244);
   }
