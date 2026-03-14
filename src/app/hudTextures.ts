@@ -53,13 +53,6 @@ function createSolidLabelTexture(label: string): HTMLCanvasElement {
     context.fillRect(x, 0, 2, canvas.height);
   }
 
-  context.fillStyle = "rgba(255, 255, 255, 0.16)";
-  context.fillRect(0, 2, canvas.width, 3);
-
-  context.globalCompositeOperation = "screen";
-  context.fillStyle = "rgba(212, 187, 99, 0.22)";
-  context.fillRect(0, 0, canvas.width, Math.max(3, Math.floor(canvas.height * 0.18)));
-
   context.globalCompositeOperation = "source-over";
   return canvas;
 }
@@ -78,19 +71,17 @@ function createNoiseGlyphTexture(
   }
 
   context.clearRect(0, 0, width, height);
+  fillNoiseTexture(context, width, height, seedFromString(seedKey), {
+    base: 164,
+    spread: 40,
+  });
+
+  context.globalCompositeOperation = "destination-in";
   context.font = font;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillStyle = "#f2f5eb";
+  context.fillStyle = "#000";
   context.fillText(text, width / 2, Math.floor(height / 2) + 1);
-
-  context.globalCompositeOperation = "source-atop";
-  fillNoiseTexture(context, width, height, seedFromString(seedKey), {
-    base: 196,
-    spread: 72,
-  });
-  context.fillStyle = "rgba(255, 255, 255, 0.12)";
-  context.fillRect(0, 0, width, Math.max(2, Math.floor(height * 0.16)));
   context.globalCompositeOperation = "source-over";
   return canvas;
 }

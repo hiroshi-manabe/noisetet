@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getNextTheme,
   resolveTheme,
   resolveThemeFromSources,
   rotationToQuarterTurns,
@@ -20,6 +21,11 @@ describe("theme selection", () => {
   it("accepts explicit theme names", () => {
     expect(resolveTheme("solid")).toBe("solid");
     expect(resolveTheme("noise")).toBe("noise");
+  });
+
+  it("toggles between solid and noise", () => {
+    expect(getNextTheme("solid")).toBe("noise");
+    expect(getNextTheme("noise")).toBe("solid");
   });
 
   it("converts rotations to quarter turns", () => {

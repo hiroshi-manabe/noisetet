@@ -111,6 +111,8 @@ Visual roles include at minimum:
 
 Each role owns a persistent material.
 
+Scene-surface roles such as the background, frame, playfield surface, and side panels should be represented as full-surface textures or images rather than repeated tiles. This keeps the renderer compatible with future arbitrary theme artwork and avoids tiling periodicity that would weaken the noise concept.
+
 #### 6.2 Solid theme
 
 In solid mode:
@@ -127,7 +129,9 @@ In noise mode:
 
 - all major visible elements use fixed white-noise materials
 - the noise must be pre-generated and persistent
-- the frame and Next area must also be white-noise-based, not normal readable widgets
+- the frame, playfield surface, active piece, and settled field should converge toward the same perceived gray density when static
+- the `NEXT` helper label should be omitted
+- user-HUD labels and digits should render as glyph-only overlays rather than as boxed widgets
 - the player should rely on motion and change rather than static contrast
 
 Noise mode is the artistic identity of the project.
@@ -159,6 +163,8 @@ Rules:
 - a hidden persisted storage override may still exist as a fallback
 - if both environment and storage are present, the environment value takes precedence
 - theme selection must not alter gameplay state, randomization, or timings
+- in `debug` and `debug20g`, the active theme may be toggled live without resetting gameplay or presentation state
+- because debug modes can toggle theme at runtime, no additional combined startup modes are required
 
 ---
 
@@ -627,7 +633,8 @@ User-facing HUD:
   - `PIECES`
   - piece count
 - uses no debug-only state labels or internal counters
-- the `NEXT` label may remain a simple helper label rather than a textured/noise-treated material role
+- in solid mode, the `NEXT` label may remain a simple helper label rather than a textured/noise-treated material role
+- in noise mode, the `NEXT` label should not be shown
 
 Debug HUD:
 
@@ -641,12 +648,13 @@ Text rendering requirements:
 - `SCORE` and `PIECES` are rendered as textured image assets rather than dynamic text
 - `SCORE` and `PIECES` should be visually scaled to approximately the same height as the numeric digits
 - numeric digits are rendered from textured digit assets rather than font rasterization
-- `SCORE` and `PIECES` should blink by appearing and disappearing against the panel background rather than by swapping between bright and dark variants
-- numeric values should remain stable and readable rather than blinking
+- user-HUD labels and numeric values should remain stable and readable rather than blinking
 - the user HUD display caps at `99999` for score and `999` for pieces, but the underlying gameplay state is not capped by that presentation limit
 - score uses a fixed five-digit right-aligned display region
 - pieces uses a fixed three-digit right-aligned display region
 - HUD textures and frame/panel materials should come from the active theme rather than being hard-coded in the renderer
+- in noise mode, only the label and digit strokes should be drawn over the shared background; the renderer should not draw boxed HUD panels behind them
+- in noise mode, HUD glyphs should use a modestly brighter persistent noise band than the gameplay surfaces so they remain readable at small size without turning into flat white text
 
 ---
 
@@ -678,6 +686,8 @@ The noise theme must obey the following design rules:
 - movement is the primary source of visibility
 - stillness is concealment
 - impact shake and line clear motion should briefly reveal structure
+- if the player pauses on a frame, major scene elements should approach perceptual collapse rather than remaining separated by clear static chrome
+- the effect should come from matched luminance and persistent material differences, not from full-frame regeneration
 
 The effect depends on persistence.
 

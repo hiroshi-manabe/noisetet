@@ -8,11 +8,13 @@ import {
 } from "../core/index.js";
 import {
   createTheme,
+  getNextTheme,
   resolveThemeFromSources,
   rotationToQuarterTurns,
   THEME_ENV_KEY,
   THEME_STORAGE_KEY,
   type AppTheme,
+  type ThemeDimensions,
   type TileMaterial,
 } from "./theme.js";
 import {
@@ -48,7 +50,6 @@ const HUD_PANEL_X = SIDE_PANEL_X;
 const HUD_PANEL_Y = BOARD_Y + 292;
 const HUD_PANEL_WIDTH = 110;
 const HUD_PANEL_HEIGHT = 212;
-const LABEL_BLINK_FRAMES = 30;
 const SCORE_DISPLAY_DIGITS = 5;
 const SCORE_DISPLAY_MAX = 99999;
 const PIECES_DISPLAY_DIGITS = 3;
@@ -85,6 +86,21 @@ if (renderingContext === null) {
 
 const context: CanvasRenderingContext2D = renderingContext;
 
+const themeDimensions: ThemeDimensions = {
+  canvasWidth: canvas.width,
+  canvasHeight: canvas.height,
+  boardWidth: BOARD_WIDTH,
+  boardHeight: BOARD_HEIGHT,
+  frameOuterWidth: FRAME_OUTER_WIDTH,
+  frameOuterHeight: FRAME_OUTER_HEIGHT,
+  previewPanelWidth: 110,
+  previewPanelHeight: 276,
+  previewBoxSize: PREVIEW_BOX,
+  hudPanelWidth: HUD_PANEL_WIDTH,
+  hudPanelHeight: HUD_PANEL_HEIGHT,
+  frameThickness: FRAME_THICKNESS,
+};
+
 function readBootMode(): BootMode {
   try {
     return resolveBootModeFromSources(
@@ -109,13 +125,13 @@ function readTheme(): AppTheme["name"] {
 
 const bootSession = createBootSession(readBootMode());
 const debugMode = isDebugMode(bootSession.mode);
-const theme = createTheme(readTheme(), CELL_SIZE);
+let themeName: AppTheme["name"] = readTheme();
+let theme = createTheme(themeName, themeDimensions);
 
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
 let isPaused = bootSession.paused;
 let elapsedGameplayMs = 0;
-let uiAnimationFrames = 0;
 let accumulator = 0;
 let previousTime = performance.now();
 
@@ -125,16 +141,26 @@ if (!debugMode) {
   shell.style.width = "min(700px, calc(100vw - 32px))";
 }
 
-subtitle.textContent =
-  bootSession.mode === "normal"
-    ? `${theme.displayName} Prototype`
-    : bootSession.mode === "debug20g"
-      ? `${theme.displayName} Debug 20G`
-      : `${theme.displayName} Debug`;
+function updateSubtitle(): void {
+  subtitle.textContent =
+    bootSession.mode === "normal"
+      ? `${theme.displayName} Prototype`
+      : bootSession.mode === "debug20g"
+        ? `${theme.displayName} Debug 20G`
+        : `${theme.displayName} Debug`;
+}
+
+function applyTheme(nextThemeName: AppTheme["name"]): void {
+  themeName = nextThemeName;
+  theme = createTheme(themeName, themeDimensions);
+  updateSubtitle();
+}
+
+updateSubtitle();
 
 window.addEventListener("keydown", (event) => {
   if (
-    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP"].includes(
+    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyV"].includes(
       event.code,
     )
   ) {
@@ -150,12 +176,16 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (debugMode && event.code === "KeyV" && !event.repeat) {
+    applyTheme(getNextTheme(themeName));
+    return;
+  }
+
   if (state.phase === "GameOver" && event.code === "KeyR") {
     state = createBootSession(bootSession.mode).state;
     presentationState = createPresentationState(state);
     isPaused = false;
     elapsedGameplayMs = 0;
-    uiAnimationFrames = 0;
     accumulator = 0;
     pressedKeys.clear();
   }
@@ -174,21 +204,6 @@ function buildInputFrame(): InputFrame {
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
   };
-}
-
-function fillTiledTexture(texture: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
-  context.save();
-  context.beginPath();
-  context.rect(x, y, width, height);
-  context.clip();
-
-  for (let drawY = y; drawY < y + height; drawY += texture.height) {
-    for (let drawX = x; drawX < x + width; drawX += texture.width) {
-      context.drawImage(texture, drawX, drawY);
-    }
-  }
-
-  context.restore();
 }
 
 function drawMaterialCell(
@@ -213,7 +228,7 @@ function drawBoardGrid(): void {
   const originX = BOARD_X;
   const originY = BOARD_Y;
 
-  fillTiledTexture(theme.boardSurfaceTexture, originX, originY, BOARD_WIDTH, BOARD_HEIGHT);
+  context.drawImage(theme.boardSurfaceTexture, originX, originY);
 
   context.strokeStyle = theme.gridStroke;
   context.lineWidth = 1;
@@ -238,28 +253,7 @@ function drawBoardGrid(): void {
 function drawFrame(view: PresentationView): void {
   const originX = FRAME_X + view.shakeOffset.x;
   const originY = FRAME_Y + view.shakeOffset.y;
-
-  for (let x = 0; x < FRAME_OUTER_WIDTH; x += FRAME_THICKNESS) {
-    context.drawImage(theme.frameTile, originX + x, originY, FRAME_THICKNESS, FRAME_THICKNESS);
-    context.drawImage(
-      theme.frameTile,
-      originX + x,
-      originY + FRAME_OUTER_HEIGHT - FRAME_THICKNESS,
-      FRAME_THICKNESS,
-      FRAME_THICKNESS,
-    );
-  }
-
-  for (let y = FRAME_THICKNESS; y < FRAME_OUTER_HEIGHT - FRAME_THICKNESS; y += FRAME_THICKNESS) {
-    context.drawImage(theme.frameTile, originX, originY + y, FRAME_THICKNESS, FRAME_THICKNESS);
-    context.drawImage(
-      theme.frameTile,
-      originX + FRAME_OUTER_WIDTH - FRAME_THICKNESS,
-      originY + y,
-      FRAME_THICKNESS,
-      FRAME_THICKNESS,
-    );
-  }
+  context.drawImage(theme.frameSurface, originX, originY);
 }
 
 function drawField(view: PresentationView): void {
@@ -355,23 +349,33 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
 }
 
 function drawPreviews(view: PresentationView): void {
-  fillTiledTexture(theme.panelTexture, SIDE_PANEL_X, BOARD_Y, 110, 276);
+  if (theme.showPreviewPanelChrome) {
+    context.drawImage(theme.previewPanelSurface, SIDE_PANEL_X, BOARD_Y);
+    context.strokeStyle = theme.panelStroke;
+    context.lineWidth = 2;
+    context.strokeRect(
+      SIDE_PANEL_X + 0.5,
+      BOARD_Y + 0.5,
+      themeDimensions.previewPanelWidth - 1,
+      themeDimensions.previewPanelHeight - 1,
+    );
+  }
 
-  context.strokeStyle = theme.panelStroke;
-  context.lineWidth = 2;
-  context.strokeRect(SIDE_PANEL_X, BOARD_Y, 110, 276);
-
-  context.fillStyle = theme.nextLabelColor;
-  context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
-  context.fillText("NEXT", SIDE_PANEL_X + 16, BOARD_Y + 20);
+  if (theme.showNextLabel) {
+    context.fillStyle = theme.nextLabelColor;
+    context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
+    context.fillText("NEXT", SIDE_PANEL_X + 16, BOARD_Y + 20);
+  }
 
   view.queuePreviews.forEach((preview) => {
     const boxX = SIDE_PANEL_X + 16;
     const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 84;
 
-    fillTiledTexture(theme.previewBoxTexture, boxX, boxY, PREVIEW_BOX, PREVIEW_BOX);
-    context.strokeStyle = theme.previewBoxStroke;
-    context.strokeRect(boxX + 0.5, boxY + 0.5, PREVIEW_BOX - 1, PREVIEW_BOX - 1);
+    if (theme.showPreviewBoxChrome) {
+      context.drawImage(theme.previewBoxSurface, boxX, boxY);
+      context.strokeStyle = theme.previewBoxStroke;
+      context.strokeRect(boxX + 0.5, boxY + 0.5, PREVIEW_BOX - 1, PREVIEW_BOX - 1);
+    }
     drawPreviewPiece(preview.type, boxX, boxY);
   });
 }
@@ -390,34 +394,25 @@ function drawTexturedNumber(value: number, x: number, y: number, slots: number, 
   }
 }
 
-function shouldDrawBlinkLabel(): boolean {
-  const phase = uiAnimationFrames % (LABEL_BLINK_FRAMES * 2);
-  return phase < LABEL_BLINK_FRAMES;
-}
-
 function drawHudLabel(texture: HTMLCanvasElement, x: number, y: number): void {
   context.drawImage(texture, x, y);
 }
 
 function drawUserHud(view: PresentationView): void {
-  fillTiledTexture(theme.panelTexture, HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
+  if (theme.showHudPanelChrome) {
+    context.drawImage(theme.hudPanelSurface, HUD_PANEL_X, HUD_PANEL_Y);
+    context.strokeStyle = theme.panelStroke;
+    context.lineWidth = 2;
+    context.strokeRect(HUD_PANEL_X + 0.5, HUD_PANEL_Y + 0.5, HUD_PANEL_WIDTH - 1, HUD_PANEL_HEIGHT - 1);
+  }
 
-  context.strokeStyle = theme.panelStroke;
-  context.lineWidth = 2;
-  context.strokeRect(HUD_PANEL_X, HUD_PANEL_Y, HUD_PANEL_WIDTH, HUD_PANEL_HEIGHT);
-
-  const drawBlinkLabel = shouldDrawBlinkLabel();
   const labelX = HUD_PANEL_X + 8;
   const digitsX = HUD_PANEL_X + 8;
 
-  if (drawBlinkLabel) {
-    drawHudLabel(theme.hudTextures.labels.score, labelX, HUD_PANEL_Y + 12);
-  }
+  drawHudLabel(theme.hudTextures.labels.score, labelX, HUD_PANEL_Y + 12);
   drawTexturedNumber(view.score, digitsX, HUD_PANEL_Y + 48, SCORE_DISPLAY_DIGITS, SCORE_DISPLAY_MAX);
 
-  if (drawBlinkLabel) {
-    drawHudLabel(theme.hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 104);
-  }
+  drawHudLabel(theme.hudTextures.labels.pieces, labelX, HUD_PANEL_Y + 104);
   drawTexturedNumber(
     view.pieceCount,
     digitsX + (SCORE_DISPLAY_DIGITS - PIECES_DISPLAY_DIGITS) * theme.hudTextures.digitWidth,
@@ -449,7 +444,7 @@ function renderStats(view: PresentationView, paused: boolean, elapsedMs: number)
 
 function render(view: PresentationView): void {
   context.clearRect(0, 0, canvas.width, canvas.height);
-  fillTiledTexture(theme.backgroundTexture, 0, 0, canvas.width, canvas.height);
+  context.drawImage(theme.backgroundTexture, 0, 0);
 
   drawBoardGrid();
   drawFrame(view);
@@ -504,7 +499,6 @@ function loop(now: number): void {
     if (previousState.phase !== "GameOver") {
       elapsedGameplayMs += FRAME_MS;
     }
-    uiAnimationFrames += 1;
     accumulator -= FRAME_MS;
   }
 
