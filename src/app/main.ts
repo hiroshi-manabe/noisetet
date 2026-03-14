@@ -99,7 +99,7 @@ function readBootMode(): BootMode {
   }
 }
 
-const bootSession = createBootSession(readBootMode(), 7);
+const bootSession = createBootSession(readBootMode());
 const debugMode = isDebugMode(bootSession.mode);
 
 let state = bootSession.state;
@@ -142,7 +142,7 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (state.phase === "GameOver" && event.code === "KeyR") {
-    state = createBootSession(bootSession.mode, 7).state;
+    state = createBootSession(bootSession.mode).state;
     presentationState = createPresentationState(state);
     isPaused = false;
     elapsedGameplayMs = 0;

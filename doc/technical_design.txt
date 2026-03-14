@@ -343,6 +343,8 @@ Rules:
 - `normal` is the user-facing mode and starts unpaused
 - `debug` is non-user-facing and starts paused
 - `debug20g` is non-user-facing and starts paused
+- `normal` should seed the randomizer from a time-derived source rather than a fixed development seed
+- `debug` and `debug20g` should use a fixed deterministic seed by default so behavior stays reproducible during testing
 - after a game-over restart, the next run should start unpaused regardless of debug boot mode
 - `debug20g` should initialize directly into `20G` conditions with piece count set to `500`
 - no in-game mode transitions are required
@@ -611,6 +613,7 @@ User-facing HUD:
   - `PIECES`
   - piece count
 - uses no debug-only state labels or internal counters
+- the `NEXT` label may remain a simple helper label rather than a textured/noise-treated material role
 
 Debug HUD:
 

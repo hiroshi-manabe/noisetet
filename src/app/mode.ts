@@ -34,7 +34,15 @@ export function isDebugMode(mode: BootMode): boolean {
   return mode !== "normal";
 }
 
-export function createBootSession(mode: BootMode, seed = 7): BootSession {
+export function resolveBootSeed(mode: BootMode, timeMs = Date.now()): number {
+  if (mode === "normal") {
+    return (Math.floor(timeMs) >>> 0) || 1;
+  }
+
+  return 7;
+}
+
+export function createBootSession(mode: BootMode, seed = resolveBootSeed(mode)): BootSession {
   switch (mode) {
     case "debug":
       return {

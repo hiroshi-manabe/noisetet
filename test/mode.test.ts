@@ -6,6 +6,7 @@ import {
   isDebugMode,
   resolveBootMode,
   resolveBootModeFromSources,
+  resolveBootSeed,
 } from "../src/app/mode.js";
 
 describe("boot modes", () => {
@@ -34,6 +35,12 @@ describe("boot modes", () => {
     expect(createBootSession("debug").paused).toBe(true);
     expect(createBootSession("debug20g").paused).toBe(true);
     expect(createBootSession("normal").paused).toBe(false);
+  });
+
+  it("uses time-derived seed only for normal mode", () => {
+    expect(resolveBootSeed("normal", 123456789)).toBe(123456789);
+    expect(resolveBootSeed("debug", 123456789)).toBe(7);
+    expect(resolveBootSeed("debug20g", 123456789)).toBe(7);
   });
 
   it("boots debug20g at 20G conditions", () => {
