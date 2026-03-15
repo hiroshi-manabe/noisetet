@@ -817,6 +817,20 @@ When the run ends in noise mode:
 - the reveal should stop at partial darkening instead of full black; the current default target is about `60%` black coverage
 - the playfield surface/background should stay in the shared noise field so the reveal reads as hidden structure emerging from that field rather than as a mode change
 
+#### 17.4 Sound
+
+The project should keep sound minimal and event-driven.
+
+- use generated Web Audio synthesis rather than external sound files for the first implementation
+- the initial sound set should contain only:
+  - an `impact` sound
+  - a `line clear` sound
+- the `impact` sound should play on every grounded-contact event, even if the visual shake is restricted to first contact only
+- the same `impact` sound should also play for manual shake on `S`
+- an airborne hard drop that locks immediately should still play the `impact` sound
+- the `line clear` sound should play when the game enters `LineClear`
+- movement, rotation, and other UI sounds should stay out unless later playtesting shows they are necessary
+
 ---
 
 ### 18. Data Ownership

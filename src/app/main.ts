@@ -7,6 +7,10 @@ import {
   type Tetromino,
 } from "../core/index.js";
 import {
+  createGameAudio,
+  detectAudioEvents,
+} from "./audio.js";
+import {
   createTheme,
   getNextTheme,
   resolveRuntimeTheme,
@@ -130,6 +134,7 @@ const bootSession = createBootSession(readBootMode());
 const debugMode = isDebugMode(bootSession.mode);
 let themeName: AppTheme["name"] = readTheme();
 let theme = createTheme(themeName, themeDimensions);
+const audio = createGameAudio();
 
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
@@ -150,6 +155,8 @@ function applyTheme(nextThemeName: AppTheme["name"]): void {
 }
 
 window.addEventListener("keydown", (event) => {
+  audio.unlock();
+
   if (
     ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyS", "KeyV"].includes(
       event.code,
@@ -174,6 +181,7 @@ window.addEventListener("keydown", (event) => {
 
   if (event.code === "KeyS" && !event.repeat && !isPaused && state.phase !== "GameOver") {
     presentationState = triggerImpactShake(presentationState, state);
+    audio.playImpact();
     return;
   }
 
@@ -189,6 +197,10 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("keyup", (event) => {
   pressedKeys.delete(event.code);
+});
+
+window.addEventListener("pointerdown", () => {
+  audio.unlock();
 });
 
 function buildInputFrame(): InputFrame {
@@ -605,6 +617,13 @@ function loop(now: number): void {
     const previousState = state;
     state = stepGame(state, buildInputFrame());
     presentationState = updatePresentationState(presentationState, previousState, state);
+    const audioEvents = detectAudioEvents(previousState, state);
+    if (audioEvents.playImpact) {
+      audio.playImpact();
+    }
+    if (audioEvents.playLineClear) {
+      audio.playLineClear();
+    }
     if (previousState.phase !== "GameOver") {
       elapsedGameplayMs += FRAME_MS;
     }
