@@ -562,14 +562,15 @@ function render(view: PresentationView): void {
   drawUserHud(view);
 
   if (view.phase === "GameOver") {
+    const overlayY = BOARD_Y + 160;
+    const overlayHeight = 128;
+    const overlayCenterX = BOARD_X + BOARD_WIDTH / 2;
+
     context.fillStyle = theme.overlayFill;
-    context.fillRect(BOARD_X, BOARD_Y + 180, BOARD_WIDTH, 96);
-    context.fillStyle = theme.overlayText;
-    context.font = '18px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
-    context.fillText("GAME OVER", BOARD_X + 110, BOARD_Y + 218);
-    context.fillStyle = theme.overlayMuted;
-    context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
-    context.fillText("Press R to restart", BOARD_X + 104, BOARD_Y + 244);
+    context.fillRect(BOARD_X, overlayY, BOARD_WIDTH, overlayHeight);
+    drawCenteredLabel(theme.hudTextures.overlayLabels.gameOver, overlayCenterX, overlayY + 12);
+    drawCenteredLabel(theme.hudTextures.overlayLabels.pressR, overlayCenterX, overlayY + 46);
+    drawCenteredLabel(theme.hudTextures.overlayLabels.toRestart, overlayCenterX, overlayY + 80);
   }
 
   if (isPaused) {

@@ -140,8 +140,11 @@ export interface HudTextures {
   };
   overlayLabels: {
     paused: HTMLCanvasElement;
+    gameOver: HTMLCanvasElement;
     pressP: HTMLCanvasElement;
     toResume: HTMLCanvasElement;
+    pressR: HTMLCanvasElement;
+    toRestart: HTMLCanvasElement;
   };
   digits: Record<string, HTMLCanvasElement>;
   digitWidth: number;
@@ -161,8 +164,11 @@ export function createHudTextures(mode: HudTextureMode): HudTextures {
     },
     overlayLabels: {
       paused: createLabelTexture("PAUSED", mode, OVERLAY_LABEL_WIDTH),
+      gameOver: createLabelTexture("GAME OVER", mode, OVERLAY_LABEL_WIDTH),
       pressP: createLabelTexture("PRESS P", mode, OVERLAY_LABEL_WIDTH),
       toResume: createLabelTexture("TO RESUME", mode, OVERLAY_LABEL_WIDTH),
+      pressR: createLabelTexture("PRESS R", mode, OVERLAY_LABEL_WIDTH),
+      toRestart: createLabelTexture("TO RESTART", mode, OVERLAY_LABEL_WIDTH),
     },
     digits,
     digitWidth: DIGIT_WIDTH,

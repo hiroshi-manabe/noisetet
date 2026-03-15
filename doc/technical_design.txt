@@ -362,6 +362,8 @@ This behavior is important for two reasons:
 - unpause resumes from the same gameplay state with no accumulated simulation backlog
 - the pause overlay should use the same textured label-rendering system as the HUD
 - the pause prompt should be split across two lines (`PRESS P` / `TO RESUME`) rather than shrinking the text below the HUD label scale
+- the game-over overlay should use the same textured label-rendering system and scale as the pause overlay
+- the game-over restart prompt should be split across two lines (`PRESS R` / `TO RESTART`) rather than shrinking the text below the HUD label scale
 
 #### 9.3 Application boot modes
 
