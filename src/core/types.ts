@@ -50,6 +50,7 @@ export interface InputFrame {
   rotateCCW: boolean;
   up: boolean;
   down: boolean;
+  shake?: boolean;
 }
 
 export interface InputMemory {
@@ -73,6 +74,7 @@ export interface GameState {
   activePiece: ActivePiece | null;
   pieceCount: number;
   score: number;
+  manualShakeUsedSinceLastClear: boolean;
   gravityInternal: number;
   inputMemory: InputMemory;
   areFramesRemaining: number;

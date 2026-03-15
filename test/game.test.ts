@@ -126,7 +126,7 @@ describe("game state", () => {
 
     expect(state.phase).toBe("LineClear");
     expect(state.pendingClearedRows).toEqual([20]);
-    expect(state.score).toBe(400);
+    expect(state.score).toBe(800);
 
     for (let frame = 0; frame < state.config.timings.lineClearDelay; frame += 1) {
       state = stepGame(state);
@@ -182,7 +182,7 @@ describe("game state", () => {
       down: false,
     });
 
-    expect(state.score).toBe(200);
+    expect(state.score).toBe(400);
   });
 
   it("applies the bravo multiplier on an all clear", () => {
@@ -219,7 +219,139 @@ describe("game state", () => {
       down: false,
     });
 
+    expect(state.score).toBe(800);
+  });
+
+  it("removes the no-shake score reward after manual shake use", () => {
+    const field = createEmptyField();
+    for (let x = 4; x < 10; x += 1) {
+      field[20][x] = "T";
+    }
+
+    let state = createInitialGameState({ seed: 7, field });
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: false,
+      shake: true,
+    });
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+      shake: false,
+    });
+
     expect(state.score).toBe(400);
+  });
+
+  it("restores the no-shake score reward after a line clear", () => {
+    const field = createEmptyField();
+    for (let x = 4; x < 10; x += 1) {
+      field[20][x] = "T";
+    }
+
+    let state = createInitialGameState({ seed: 7, field });
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: false,
+      shake: true,
+    });
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+      shake: false,
+    });
+
+    for (let frame = 0; frame < state.config.timings.lineClearDelay + state.config.timings.lineAre + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    const secondField = createEmptyField();
+    for (let x = 4; x < 10; x += 1) {
+      secondField[20][x] = "T";
+    }
+
+    state = {
+      ...state,
+      field: secondField,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+      phase: "Active",
+      pendingClearedRows: [],
+      lineClearFramesRemaining: 0,
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+      shake: false,
+    });
+
+    expect(state.score).toBe(1208);
   });
 
   it("moves one cell on a new horizontal press", () => {

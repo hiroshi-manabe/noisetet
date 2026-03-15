@@ -27,6 +27,7 @@ import {
 } from "./mode.js";
 import {
   createPresentationState,
+  triggerImpactShake,
   updatePresentationState,
   type PresentationState,
   type PresentationView,
@@ -149,7 +150,7 @@ function applyTheme(nextThemeName: AppTheme["name"]): void {
 
 window.addEventListener("keydown", (event) => {
   if (
-    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyV"].includes(
+    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyS", "KeyV"].includes(
       event.code,
     )
   ) {
@@ -167,6 +168,11 @@ window.addEventListener("keydown", (event) => {
 
   if (debugMode && event.code === "KeyV" && !event.repeat) {
     applyTheme(getNextTheme(themeName));
+    return;
+  }
+
+  if (event.code === "KeyS" && !event.repeat && !isPaused && state.phase !== "GameOver") {
+    presentationState = triggerImpactShake(presentationState, state);
     return;
   }
 
@@ -192,6 +198,7 @@ function buildInputFrame(): InputFrame {
     rotateCCW: pressedKeys.has("KeyZ") || pressedKeys.has("KeyC"),
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
+    shake: pressedKeys.has("KeyS"),
   };
 }
 

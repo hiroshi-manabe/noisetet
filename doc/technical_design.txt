@@ -308,11 +308,13 @@ Rules:
 - score scales by piece count using:
   - `levelMultiplier = (100 + piecesBeforeLock) / 100`
 - a bravo applies a `x4` multiplier
+- if no manual shake has been used since the previous line clear, the next line clear receives a `x2` no-shake reward
+- using manual shake removes that reward for the next line clear only; after a line clear resolves, the reward state resets
 - combo, soft-drop, hard-drop-distance, sonic-drop, and speed bonuses do not exist
 
 Recommended formula:
 
-`scoreGain = floor(clearBase[linesCleared] * levelMultiplier) * bravoMultiplier`
+`scoreGain = floor(clearBase[linesCleared] * levelMultiplier) * bravoMultiplier * noShakeMultiplier`
 
 This keeps score readable and arcade-like without inheriting TAP's full scoring identity.
 
@@ -448,6 +450,7 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 - if `Down` is newly pressed while the piece is already grounded, it may force immediate lock
 - `Up` moves the piece to its final reachable resting position and locks it immediately in the same gameplay step
 - `Up` grants no post-drop lock delay and no post-drop correction window
+- `S` triggers manual shake and marks the current scoring interval as having used shake
 - zangi-style play enabled by sonic drop should not exist in this project
 
 #### 10.4 State transition details
@@ -780,6 +783,8 @@ When an active piece first makes grounded contact:
 If an airborne hard drop locks immediately before a grounded frame can be displayed, it should still trigger the same impact shake.
 
 The same active piece should not retrigger impact shake repeatedly just by briefly leaving and re-touching the surface.
+
+In the current prototype, the player may also trigger the same shake manually with `S`. This is unrestricted and does not alter movement rules, but it does disable the `x2` no-shake score reward for the next line clear.
 
 This is not merely decorative. It is part of how the noise concept becomes playable.
 

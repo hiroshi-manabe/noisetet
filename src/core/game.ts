@@ -21,6 +21,7 @@ export const EMPTY_INPUT: InputFrame = {
   rotateCCW: false,
   up: false,
   down: false,
+  shake: false,
 };
 
 const SPAWN_X: Record<Tetromino, number> = {
@@ -90,6 +91,7 @@ export function createInitialGameState(options?: {
     activePiece: null,
     pieceCount,
     score,
+    manualShakeUsedSinceLastClear: false,
     gravityInternal: resolveGravityInternal(pieceCount, config),
     inputMemory: createInputMemory(),
     areFramesRemaining: config.timings.are,
@@ -378,6 +380,7 @@ function calculateScoreGain(
   linesCleared: number,
   piecesBeforeLock: number,
   bravo: boolean,
+  noShakeReward: boolean,
 ): number {
   const baseScore = SCORE_BY_LINES[linesCleared] ?? 0;
   if (baseScore === 0) {
@@ -385,7 +388,7 @@ function calculateScoreGain(
   }
 
   const scaledScore = Math.floor(baseScore * ((100 + piecesBeforeLock) / 100));
-  return scaledScore * (bravo ? 4 : 1);
+  return scaledScore * (bravo ? 4 : 1) * (noShakeReward ? 2 : 1);
 }
 
 function applyGravity(
@@ -432,6 +435,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
       pendingClearedRows.length,
       state.pieceCount,
       pendingClearedRows.length > 0 && isFieldEmpty(collapsedField),
+      !state.manualShakeUsedSinceLastClear,
     );
 
   if (pendingClearedRows.length > 0) {
@@ -442,6 +446,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
       activePiece: null,
       pieceCount: nextPieceCount,
       score: nextScore,
+      manualShakeUsedSinceLastClear: false,
       gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
       lineClearFramesRemaining: state.config.timings.lineClearDelay,
       pendingClearedRows,
@@ -455,6 +460,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
     activePiece: null,
     pieceCount: nextPieceCount,
     score: nextScore,
+    manualShakeUsedSinceLastClear: state.manualShakeUsedSinceLastClear,
     gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
     areFramesRemaining: state.config.timings.are,
     pendingClearedRows: [],
@@ -638,8 +644,10 @@ function stepLineClearState(state: GameState): GameState {
 export function stepGame(state: GameState, input: InputFrame = EMPTY_INPUT): GameState {
   const previousInput = state.inputMemory.previousInput;
   const nextInputMemory = updateInputMemory(state, input);
+  const shakePressed = Boolean(input.shake) && !Boolean(previousInput.shake);
   const nextState: GameState = {
     ...state,
+    manualShakeUsedSinceLastClear: state.manualShakeUsedSinceLastClear || shakePressed,
     inputMemory: nextInputMemory,
   };
 
