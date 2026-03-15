@@ -306,6 +306,28 @@ export function createPresentationState(
   };
 }
 
+export function triggerImpactShake(
+  presentationState: PresentationState,
+  gameState: GameState,
+): PresentationState {
+  const impactShakeFramesRemaining = presentationState.config.impactShakeFrames;
+
+  return {
+    ...presentationState,
+    impactShakeFramesRemaining,
+    view: buildView(
+      presentationState.settledField,
+      gameState,
+      presentationState.queueSlideFramesRemaining,
+      impactShakeFramesRemaining,
+      presentationState.activePieceMotionOffset,
+      presentationState.activePieceMotionFramesRemaining,
+      presentationState.entryMotionFramesRemaining,
+      presentationState.config,
+    ),
+  };
+}
+
 export function updatePresentationState(
   previousPresentationState: PresentationState,
   previousGameState: GameState,

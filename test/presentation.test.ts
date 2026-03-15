@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createEmptyField, createInitialGameState, stepGame } from "../src/core/index.js";
 import {
   createPresentationState,
+  triggerImpactShake,
   updatePresentationState,
 } from "../src/presentation/index.js";
 
@@ -322,6 +323,21 @@ describe("presentation state", () => {
     expect(sawUpwardRecovery).toBe(true);
     expect(presentationState.impactShakeFramesRemaining).toBe(0);
     expect(presentationState.view.shakeOffset).toEqual({ x: 0, y: 0 });
+  });
+
+  it("can trigger a manual shake without changing gameplay state", () => {
+    const gameState = advanceToActiveState();
+    const presentationState = createPresentationState(gameState);
+
+    const shakenState = triggerImpactShake(presentationState, gameState);
+
+    expect(shakenState.impactShakeFramesRemaining).toBe(
+      presentationState.config.impactShakeFrames,
+    );
+    expect(shakenState.view.phase).toBe(gameState.phase);
+    expect(shakenState.view.activePiece).toEqual(gameState.activePiece);
+    expect(shakenState.view.shakeOffset.x).toBe(0);
+    expect(shakenState.view.shakeOffset.y).toBeGreaterThan(0);
   });
 
   it("preserves locked piece orientation in the settled field", () => {
