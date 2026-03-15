@@ -4,6 +4,7 @@ const DIGIT_WIDTH = 22;
 const DIGIT_HEIGHT = 32;
 const LABEL_HEIGHT = 32;
 const LABEL_WIDTH = 110;
+const OVERLAY_LABEL_WIDTH = 180;
 
 export type HudTextureMode = "solid" | "noise";
 
@@ -31,8 +32,8 @@ function fillTexturedBackground(
   context.globalCompositeOperation = "source-over";
 }
 
-function createSolidLabelTexture(label: string): HTMLCanvasElement {
-  const canvas = createTextureCanvas(LABEL_WIDTH, LABEL_HEIGHT);
+function createSolidLabelTexture(label: string, width = LABEL_WIDTH): HTMLCanvasElement {
+  const canvas = createTextureCanvas(width, LABEL_HEIGHT);
   const context = canvas.getContext("2d");
   if (context === null) {
     throw new Error("Canvas 2D context is unavailable for HUD label texture.");
@@ -88,18 +89,22 @@ function createNoiseGlyphTexture(
   return canvas;
 }
 
-function createLabelTexture(label: string, mode: HudTextureMode): HTMLCanvasElement {
+function createLabelTexture(
+  label: string,
+  mode: HudTextureMode,
+  width = LABEL_WIDTH,
+): HTMLCanvasElement {
   if (mode === "noise") {
     return createNoiseGlyphTexture(
       label,
-      LABEL_WIDTH,
+      width,
       LABEL_HEIGHT,
       'bold 24px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace',
       `hud-label-${label}`,
     );
   }
 
-  return createSolidLabelTexture(label);
+  return createSolidLabelTexture(label, width);
 }
 
 function createDigitTexture(digit: string, mode: HudTextureMode): HTMLCanvasElement {
@@ -133,6 +138,11 @@ export interface HudTextures {
     score: HTMLCanvasElement;
     pieces: HTMLCanvasElement;
   };
+  overlayLabels: {
+    paused: HTMLCanvasElement;
+    pressP: HTMLCanvasElement;
+    toResume: HTMLCanvasElement;
+  };
   digits: Record<string, HTMLCanvasElement>;
   digitWidth: number;
   digitHeight: number;
@@ -148,6 +158,11 @@ export function createHudTextures(mode: HudTextureMode): HudTextures {
     labels: {
       score: createLabelTexture("SCORE", mode),
       pieces: createLabelTexture("PIECES", mode),
+    },
+    overlayLabels: {
+      paused: createLabelTexture("PAUSED", mode, OVERLAY_LABEL_WIDTH),
+      pressP: createLabelTexture("PRESS P", mode, OVERLAY_LABEL_WIDTH),
+      toResume: createLabelTexture("TO RESUME", mode, OVERLAY_LABEL_WIDTH),
     },
     digits,
     digitWidth: DIGIT_WIDTH,

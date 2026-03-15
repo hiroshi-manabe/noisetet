@@ -413,6 +413,10 @@ function drawHudLabel(texture: HTMLCanvasElement, x: number, y: number): void {
   context.drawImage(texture, x, y);
 }
 
+function drawCenteredLabel(texture: HTMLCanvasElement, centerX: number, y: number): void {
+  context.drawImage(texture, Math.round(centerX - texture.width / 2), y);
+}
+
 function drawUserHud(view: PresentationView): void {
   if (theme.showHudPanelChrome) {
     context.drawImage(theme.hudPanelSurface, HUD_PANEL_X, HUD_PANEL_Y);
@@ -481,14 +485,15 @@ function render(view: PresentationView): void {
   }
 
   if (isPaused) {
+    const overlayY = BOARD_Y + 160;
+    const overlayHeight = 128;
+    const overlayCenterX = BOARD_X + BOARD_WIDTH / 2;
+
     context.fillStyle = theme.overlayFill;
-    context.fillRect(BOARD_X, BOARD_Y + 180, BOARD_WIDTH, 96);
-    context.fillStyle = theme.overlayText;
-    context.font = '18px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
-    context.fillText("PAUSED", BOARD_X + 132, BOARD_Y + 218);
-    context.fillStyle = theme.overlayMuted;
-    context.font = '12px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
-    context.fillText("Press P to resume", BOARD_X + 100, BOARD_Y + 244);
+    context.fillRect(BOARD_X, overlayY, BOARD_WIDTH, overlayHeight);
+    drawCenteredLabel(theme.hudTextures.overlayLabels.paused, overlayCenterX, overlayY + 12);
+    drawCenteredLabel(theme.hudTextures.overlayLabels.pressP, overlayCenterX, overlayY + 46);
+    drawCenteredLabel(theme.hudTextures.overlayLabels.toResume, overlayCenterX, overlayY + 80);
   }
 
   if (debugMode) {

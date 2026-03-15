@@ -360,6 +360,8 @@ This behavior is important for two reasons:
 - while paused, gameplay simulation and presentation timers stop advancing
 - the current rendered frame remains visible and a pause overlay may be shown
 - unpause resumes from the same gameplay state with no accumulated simulation backlog
+- the pause overlay should use the same textured label-rendering system as the HUD
+- the pause prompt should be split across two lines (`PRESS P` / `TO RESUME`) rather than shrinking the text below the HUD label scale
 
 #### 9.3 Application boot modes
 
