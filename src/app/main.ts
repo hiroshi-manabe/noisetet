@@ -57,6 +57,7 @@ const SCORE_DISPLAY_DIGITS = 5;
 const SCORE_DISPLAY_MAX = 99999;
 const PIECES_DISPLAY_DIGITS = 3;
 const PIECES_DISPLAY_MAX = 999;
+const GAME_OVER_REVEAL_BLACK_COVERAGE = 0.4;
 
 const pressedKeys = new Set<string>();
 
@@ -202,6 +203,46 @@ function buildInputFrame(): InputFrame {
   };
 }
 
+function hashToUnit(seed: number, x: number, y: number): number {
+  let hash = seed ^ Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263);
+  hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
+  hash ^= hash >>> 16;
+  return (hash >>> 0) / 0x100000000;
+}
+
+function drawGameOverRevealDots(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  seed: number,
+  progress: number,
+): void {
+  const clampedCoverage =
+    Math.max(0, Math.min(1, progress)) * GAME_OVER_REVEAL_BLACK_COVERAGE;
+  if (clampedCoverage <= 0) {
+    return;
+  }
+
+  const startX = Math.round(x);
+  const startY = Math.round(y);
+  const endX = startX + Math.round(width);
+  const endY = startY + Math.round(height);
+
+  context.fillStyle = "#000";
+  for (let drawY = startY; drawY < endY; drawY += 1) {
+    for (let drawX = startX; drawX < endX; drawX += 1) {
+      if (hashToUnit(seed, drawX - startX, drawY - startY) <= clampedCoverage) {
+        context.fillRect(drawX, drawY, 1, 1);
+      }
+    }
+  }
+}
+
+function shouldRevealGameOver(view: PresentationView): boolean {
+  return theme.name === "noise" && view.phase === "GameOver" && view.gameOverRevealProgress > 0;
+}
+
 function drawMaterialCell(
   x: number,
   y: number,
@@ -256,11 +297,35 @@ function drawFrame(view: PresentationView): void {
   const originX = FRAME_X + view.shakeOffset.x;
   const originY = FRAME_Y + view.shakeOffset.y;
   context.drawImage(theme.frameSurface, originX, originY);
+
+  if (!shouldRevealGameOver(view)) {
+    return;
+  }
+
+  drawGameOverRevealDots(originX, originY, FRAME_OUTER_WIDTH, FRAME_THICKNESS, 101, view.gameOverRevealProgress);
+  drawGameOverRevealDots(
+    originX,
+    originY + FRAME_OUTER_HEIGHT - FRAME_THICKNESS,
+    FRAME_OUTER_WIDTH,
+    FRAME_THICKNESS,
+    102,
+    view.gameOverRevealProgress,
+  );
+  drawGameOverRevealDots(originX, originY + FRAME_THICKNESS, FRAME_THICKNESS, BOARD_HEIGHT, 103, view.gameOverRevealProgress);
+  drawGameOverRevealDots(
+    originX + FRAME_OUTER_WIDTH - FRAME_THICKNESS,
+    originY + FRAME_THICKNESS,
+    FRAME_THICKNESS,
+    BOARD_HEIGHT,
+    104,
+    view.gameOverRevealProgress,
+  );
 }
 
 function drawField(view: PresentationView): void {
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
+  const revealGameOver = shouldRevealGameOver(view);
 
   for (let y = 1; y < view.field.length; y += 1) {
     for (let x = 0; x < view.field[y].length; x += 1) {
@@ -277,6 +342,17 @@ function drawField(view: PresentationView): void {
         cell.sourceCellX,
         cell.sourceCellY,
       );
+
+      if (revealGameOver) {
+        drawGameOverRevealDots(
+          originX + x * CELL_SIZE,
+          originY + (y - 1) * CELL_SIZE,
+          CELL_SIZE,
+          CELL_SIZE,
+          2000 + y * FIELD_WIDTH + x,
+          view.gameOverRevealProgress,
+        );
+      }
     }
   }
 }
@@ -290,6 +366,7 @@ function drawActivePiece(view: PresentationView): void {
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
   const quarterTurns = rotationToQuarterTurns(activePiece.rotation);
+  const revealGameOver = shouldRevealGameOver(view);
 
   for (const cell of getCellsForPiece(activePiece)) {
     const y = activePiece.y + cell.y;
@@ -305,6 +382,17 @@ function drawActivePiece(view: PresentationView): void {
       cell.x,
       cell.y,
     );
+
+    if (revealGameOver) {
+      drawGameOverRevealDots(
+        originX + (activePiece.x + cell.x + view.activePieceOffset.x) * CELL_SIZE,
+        originY + (y - 1 + view.activePieceOffset.y) * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE,
+        3000 + y * FIELD_WIDTH + activePiece.x + cell.x,
+        view.gameOverRevealProgress,
+      );
+    }
   }
 }
 

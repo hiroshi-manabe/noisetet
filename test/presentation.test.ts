@@ -89,6 +89,23 @@ function createLineClearTransition() {
   return { previousState, currentState };
 }
 
+function createGameOverTransition() {
+  const field = createEmptyField();
+  field[0][3] = "I";
+  field[0][4] = "I";
+  field[0][5] = "I";
+  field[1][4] = "I";
+
+  let previousState = createInitialGameState({ seed: 7, field });
+
+  for (let frame = 0; frame < previousState.config.timings.are; frame += 1) {
+    previousState = stepGame(previousState);
+  }
+
+  const currentState = stepGame(previousState);
+  return { previousState, currentState };
+}
+
 describe("presentation state", () => {
   it("starts with no active presentation animations", () => {
     const gameState = createInitialGameState({ seed: 7 });
@@ -338,6 +355,27 @@ describe("presentation state", () => {
     expect(shakenState.view.activePiece).toEqual(gameState.activePiece);
     expect(shakenState.view.shakeOffset.x).toBe(0);
     expect(shakenState.view.shakeOffset.y).toBeGreaterThan(0);
+  });
+
+  it("starts a deterministic game-over reveal in presentation state", () => {
+    const { previousState, currentState } = createGameOverTransition();
+    let presentationState = createPresentationState(previousState);
+
+    presentationState = updatePresentationState(presentationState, previousState, currentState);
+
+    expect(currentState.phase).toBe("GameOver");
+    expect(presentationState.gameOverRevealFramesRemaining).toBe(
+      presentationState.config.gameOverRevealFrames,
+    );
+    expect(presentationState.view.gameOverRevealProgress).toBe(0);
+
+    const nextState = stepGame(currentState);
+    presentationState = updatePresentationState(presentationState, currentState, nextState);
+
+    expect(presentationState.gameOverRevealFramesRemaining).toBe(
+      presentationState.config.gameOverRevealFrames - 1,
+    );
+    expect(presentationState.view.gameOverRevealProgress).toBeGreaterThan(0);
   });
 
   it("preserves locked piece orientation in the settled field", () => {

@@ -8,6 +8,7 @@ export interface PresentationConfig {
   activePieceMotionFrames: number;
   entryMotionFrames: number;
   entryMotionDistanceCells: number;
+  gameOverRevealFrames: number;
 }
 
 export interface ShakeOffset {
@@ -61,6 +62,7 @@ export interface PresentationView {
   gravityInternal: number;
   lockDelayRemaining: number | null;
   shakeOffset: ShakeOffset;
+  gameOverRevealProgress: number;
 }
 
 export interface PresentationState {
@@ -70,6 +72,7 @@ export interface PresentationState {
   impactShakeFramesRemaining: number;
   activePieceMotionFramesRemaining: number;
   entryMotionFramesRemaining: number;
+  gameOverRevealFramesRemaining: number;
   hasTriggeredImpactShakeForCurrentPiece: boolean;
   activePieceMotionOffset: CellOffsetFloat;
   view: PresentationView;

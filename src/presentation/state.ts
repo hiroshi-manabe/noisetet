@@ -20,6 +20,7 @@ export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   activePieceMotionFrames: 4,
   entryMotionFrames: 6,
   entryMotionDistanceCells: 0.75,
+  gameOverRevealFrames: 60,
 };
 
 const ZERO_CELL_OFFSET: CellOffsetFloat = { x: 0, y: 0 };
@@ -266,8 +267,14 @@ function buildView(
   activePieceMotionOffset: CellOffsetFloat,
   activePieceMotionFramesRemaining: number,
   entryMotionFramesRemaining: number,
+  gameOverRevealFramesRemaining: number,
   config: PresentationConfig,
 ): PresentationView {
+  const gameOverRevealProgress =
+    gameState.phase !== "GameOver" || config.gameOverRevealFrames <= 0
+      ? 0
+      : 1 - gameOverRevealFramesRemaining / config.gameOverRevealFrames;
+
   return {
     phase: gameState.phase,
     field: buildRenderedField(settledField, gameState),
@@ -285,6 +292,7 @@ function buildView(
     gravityInternal: gameState.gravityInternal,
     lockDelayRemaining: gameState.activePiece?.lockDelayRemaining ?? null,
     shakeOffset: buildShakeOffset(impactShakeFramesRemaining, config),
+    gameOverRevealProgress: Math.max(0, Math.min(1, gameOverRevealProgress)),
   };
 }
 
@@ -300,9 +308,10 @@ export function createPresentationState(
     impactShakeFramesRemaining: 0,
     activePieceMotionFramesRemaining: 0,
     entryMotionFramesRemaining: 0,
+    gameOverRevealFramesRemaining: 0,
     hasTriggeredImpactShakeForCurrentPiece: false,
     activePieceMotionOffset: ZERO_CELL_OFFSET,
-    view: buildView(settledField, gameState, 0, 0, ZERO_CELL_OFFSET, 0, 0, config),
+    view: buildView(settledField, gameState, 0, 0, ZERO_CELL_OFFSET, 0, 0, 0, config),
   };
 }
 
@@ -323,6 +332,7 @@ export function triggerImpactShake(
       presentationState.activePieceMotionOffset,
       presentationState.activePieceMotionFramesRemaining,
       presentationState.entryMotionFramesRemaining,
+      presentationState.gameOverRevealFramesRemaining,
       presentationState.config,
     ),
   };
@@ -399,6 +409,15 @@ export function updatePresentationState(
         ? previousPresentationState.config.entryMotionFrames
         : Math.max(0, previousPresentationState.entryMotionFramesRemaining - 1);
 
+  const enteredGameOver =
+    previousGameState.phase !== "GameOver" && currentGameState.phase === "GameOver";
+  const gameOverRevealFramesRemaining =
+    enteredGameOver
+      ? previousPresentationState.config.gameOverRevealFrames
+      : currentGameState.phase === "GameOver"
+        ? Math.max(0, previousPresentationState.gameOverRevealFramesRemaining - 1)
+        : 0;
+
   const lockedPreviousPiece =
     previousGameState.activePiece !== null &&
     currentGameState.activePiece === null &&
@@ -429,6 +448,7 @@ export function updatePresentationState(
     impactShakeFramesRemaining,
     activePieceMotionFramesRemaining,
     entryMotionFramesRemaining,
+    gameOverRevealFramesRemaining,
     hasTriggeredImpactShakeForCurrentPiece:
       hasTriggeredImpactShakeForCurrentPiece || impactTriggered,
     activePieceMotionOffset,
@@ -440,6 +460,7 @@ export function updatePresentationState(
       activePieceMotionOffset,
       activePieceMotionFramesRemaining,
       entryMotionFramesRemaining,
+      gameOverRevealFramesRemaining,
       previousPresentationState.config,
     ),
   };

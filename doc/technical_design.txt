@@ -506,6 +506,10 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 
 - game over occurs only when spawning the next piece fails after allowed spawn-time processing
 - the blocked spawn piece should remain visible even if it overlaps existing stack cells
+- in noise mode, game over should not switch to the solid theme
+- instead, the frame, settled stack, and blocked spawn piece should gradually reveal themselves within noise mode by accumulating deterministic black-dot coverage
+- the reveal should not end at solid black; the default target is a partial darkening of about `60%` black coverage so the structure is readable without leaving the noise world
+- the board surface/background should remain in the same noise theme while that reveal runs
 
 #### 10.5 Project default timing profile
 
@@ -800,6 +804,17 @@ When line(s) clear:
 
 Again, this is not theme-specific. The motion exists in both themes. The difference is that in noise mode it also serves a perceptual purpose.
 
+#### 17.3 Game-over reveal
+
+When the run ends in noise mode:
+
+- the renderer should keep the current theme instead of swapping to a solid reveal view
+- the frame, settled stack, and blocked spawn piece should progressively reveal through a deterministic black-dot accumulation effect
+- the reveal should be presentation-only and must not change gameplay state
+- the reveal should advance over a short tunable duration; the current default is `60` frames
+- the reveal should stop at partial darkening instead of full black; the current default target is about `60%` black coverage
+- the playfield surface/background should stay in the shared noise field so the reveal reads as hidden structure emerging from that field rather than as a mode change
+
 ---
 
 ### 18. Data Ownership
@@ -820,6 +835,7 @@ A clean implementation should separate ownership like this:
 - shake offsets
 - queue slide offsets
 - line clear visual offsets
+- game-over reveal progress
 
 #### Theme owns
 - materials/textures for all visual roles
