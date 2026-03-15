@@ -14,8 +14,8 @@ import type {
 
 export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   queueSlideFrames: 8,
-  impactShakeFrames: 6,
-  impactShakeAmplitude: 4,
+  impactShakeFrames: 8,
+  impactShakeAmplitude: 8,
   lineClearSlideDistanceCells: 12,
   activePieceMotionFrames: 4,
   entryMotionFrames: 6,

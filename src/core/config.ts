@@ -18,7 +18,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   fieldHeight: FIELD_HEIGHT,
   queueLength: QUEUE_LENGTH,
   previewCount: PREVIEW_COUNT,
-  softDropInternalGravity: 1024,
+  softDropInternalGravity: 256,
   timings: DEFAULT_TIMINGS,
   gravityStartInternal: 4,
   gravityPre20GMaxInternal: 1280,
