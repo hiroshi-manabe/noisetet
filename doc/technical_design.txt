@@ -3,7 +3,7 @@
 
 ### 1. Purpose
 
-This document describes the technical design of a falling-block game whose gameplay foundation is a TAP/TGM2-ARS-inspired implementation, and whose artistic identity is the white-noise theme.
+This document describes the technical design of a falling-block game whose gameplay foundation is a rule set defined in this document, and whose artistic identity is the white-noise theme.
 
 The central design requirement is a deliberate duality:
 
@@ -35,18 +35,18 @@ This principle should influence all technical decisions.
 
 The gameplay baseline is:
 
-- TAP / TGM2-style ARS
+- high-spawn rotation system defined below
 - 3 Next previews
 - no Hold
 - no T-Spin handling
 - Up = hard drop + immediate lock (custom deviation)
-- Down = TAP/TGM2-style soft drop behavior (no extra custom lock rule)
+- Down = locking soft drop behavior defined below
 - custom piece-count-based gravity progression
 - custom score based on piece count, cleared lines, and bravo
 - line clear animation and impact shake are custom presentation behaviors
 - separate user HUD and debug HUD
 
-The project is not trying to reproduce every historical detail exactly, but it is trying to stay disciplined and reference-driven rather than drifting into generic "Tetris-like" behavior.
+The project is not trying to reproduce every historical detail exactly, but it is trying to stay disciplined and fully specified rather than drifting into generic falling-block behavior.
 
 ---
 
@@ -233,44 +233,44 @@ Responsibilities:
 
 The gameplay core must not know whether the piece is drawn as a colored shape or as white noise.
 
-#### 8.1 Rules reference
+#### 8.1 Core gameplay defaults
 
-The gameplay core should follow a TAP/TGM2-inspired baseline with explicit defaults:
+The gameplay core should follow the explicit defaults defined below:
 
-- ARS (not World/SRS)
+- the rotation and spawn system defined in this document
 - no Hold
 - no T-Spin logic
 - step-reset-only lock behavior
 - one-row buffer zone above the visible 20-row field (effective logical height 21)
 - deterministic frame-based timing at 60 fps
-- custom speed progression that is not TAP section logic
+- custom speed progression based on locked piece count
 
-#### 8.2 ARS behavior requirements (TAP-style)
+#### 8.2 Rotation and spawn behavior requirements
 
-- spawn in the upper rows used by ARS/TAP (piece appears high, not guideline-style low spawn)
-- L/J/T initial orientation follows ARS (initial flat side facing up)
+- spawn high in the field rather than using low modern spawn placement
+- L/J/T initial orientation uses the flat side facing up
 - I/S/Z functionally use two orientations in play
 - kick order for non-I pieces: base rotation -> +1 right -> +1 left
-- I piece does not wall-kick in TAP-style ARS
+- I piece does not wall-kick
 - L/J/T center-column constraint must be respected (no generic SRS kick table)
 - no world-rule floor-kick behavior
-- no movement-reset or Infinity-style lock behavior
+- no movement-reset-based lock refresh behavior
 
-#### 8.3 Randomizer requirements (TGM2/TAP)
+#### 8.3 Randomizer requirements
 
-- use TGM history randomizer
+- use a history randomizer
 - history size = 4
 - reroll attempts per piece = 6
 - first piece may not be S, Z, or O
-- initial history seed is TAP-style (`Z, Z, S, S` behavior)
+- initial history seed is `Z, Z, S, S`
 
-#### 8.4 Deliberate deviations from original TAP
+#### 8.4 Deliberate project-specific rules
 
-- preview count is `3` (TAP arcade baseline is `1`)
-- `Up` is hard drop with immediate lock (TAP sonic drop does not lock)
-- level progression is custom and based on locked piece count rather than TAP sections
+- preview count is `3`
+- `Up` is hard drop with immediate lock
+- level progression is based on locked piece count
 
-No other gameplay-rule deviations from TAP/TGM2 should be introduced without an explicit design update.
+No additional gameplay-rule changes should be introduced without an explicit design update.
 
 #### 8.5 Core state model
 
@@ -295,7 +295,7 @@ Additional state requirements:
 
 #### 8.6 Scoring requirements
 
-Scoring is intentionally simpler than TAP.
+Scoring is intentionally simple.
 
 Rules:
 
@@ -310,13 +310,13 @@ Rules:
 - a bravo applies a `x4` multiplier
 - if no manual shake has been used since the previous line clear, the next line clear receives a `x2` no-shake reward
 - using manual shake or auto shake removes that reward for the next line clear only; after a line clear resolves, the reward state resets
-- combo, soft-drop, hard-drop-distance, sonic-drop, and speed bonuses do not exist
+- combo, soft-drop-distance, fast-drop-distance, and speed bonuses do not exist
 
 Recommended formula:
 
 `scoreGain = floor(clearBase[linesCleared] * levelMultiplier) * bravoMultiplier * noShakeMultiplier`
 
-This keeps score readable and arcade-like without inheriting TAP's full scoring identity.
+This keeps score readable and arcade-like while remaining project-specific.
 
 ---
 
@@ -341,7 +341,7 @@ If Left or Right is already being held during entry delay, the next piece should
 
 This behavior is important for two reasons:
 
-- it supports the TGM-family feel
+- it preserves decisive pre-entry control
 - it strengthens the noise concept by giving the new piece motion at the moment of entry
 
 #### 9.1 Input rules
@@ -351,7 +351,7 @@ This behavior is important for two reasons:
 - `Up` and `Down` during `ARE` and `LineClear` do not create deferred drop actions
 - if both horizontal directions are held, the latest pressed direction wins
 - during spawn processing, apply IRS first and lateral intent second
-- if a spawn-time adjustment is invalid, it fails normally rather than invoking non-ARS rescue logic
+- if a spawn-time adjustment is invalid, it fails normally rather than invoking extra spawn rescue logic
 
 #### 9.2 Application pause control
 
@@ -395,7 +395,7 @@ Development boot mechanism:
 #### 9.4 Sidebar content
 
 - normal mode should keep the sidebar visible as a player-facing panel
-- the top of that sidebar should show the game title (`NOISETET`)
+- the top of that sidebar should show the project title
 - normal mode should show the player controls in the sidebar
 - the sidebar should include a user-facing sound toggle
 - the sidebar should include a user-facing auto-shake assist toggle
@@ -471,18 +471,18 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 
 #### 10.3 Movement, drop, and lock semantics
 
-- rotation uses TAP-style ARS only
+- rotation uses the rotation system defined in this document
 - non-`I` rotation test order is: basic rotation -> `+1` right -> `+1` left
 - `I` never kicks
 - successful shifts and rotations do not reset lock delay
 - only an actual downward step of at least one row resets lock delay
 - `Down` accelerates descent while airborne
-- the current default soft-drop speed is `256` internal gravity (`1G`), intentionally gentler than a harsher TAP-like fast-drop feel
+- the current default soft-drop speed is `256` internal gravity (`1G`), intentionally gentler than a harsher fast-drop feel
 - if `Down` is newly pressed while the piece is already grounded, it may force immediate lock
 - `Up` moves the piece to its final reachable resting position and locks it immediately in the same gameplay step
 - `Up` grants no post-drop lock delay and no post-drop correction window
 - `S` triggers manual shake and marks the current scoring interval as having used shake
-- zangi-style play enabled by sonic drop should not exist in this project
+- post-drop correction windows enabled by non-locking fast drop should not exist in this project
 
 #### 10.4 State transition details
 
@@ -496,7 +496,7 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 `Spawning`
 
 - dequeue the next piece and immediately refill the preview queue from the randomizer
-- create the piece using ARS spawn position and orientation
+- create the piece using the spawn position and orientation rules defined here
 - apply stored IRS intent first
 - apply pre-entry lateral intent second
 - if gravity is `20G`, settle the piece immediately to its final resting height before entering `Active`
@@ -542,7 +542,7 @@ This ordering keeps player action primary and avoids gravity consuming a frame b
 
 #### 10.5 Project default timing profile
 
-The project should use fixed TAP-like handling delays and a custom gravity ladder.
+The project should use fixed handling delays and a custom gravity ladder.
 
 Default handling delays (frames):
 
@@ -556,11 +556,11 @@ Default handling delays (frames):
 
 These values stay fixed across the whole game unless explicitly re-tuned later.
 
-This timing profile intentionally pulls the post-lock cadence closer to early TAP Death rhythm while keeping the project-specific progression model and preserving a full 30-frame lock delay.
+This timing profile produces a brisk high-gravity cadence while preserving the project-specific progression model and a full 30-frame lock delay.
 
 #### 10.6 Custom gravity progression
 
-Gravity progression is based on the number of pieces locked, not TAP sections or level stops.
+Gravity progression is based on the number of pieces locked.
 
 Rules:
 
@@ -583,7 +583,7 @@ For `pieceCount >= 500`:
 
 - `internalGravity = 5120` (`20G`)
 
-This curve is intentionally inspired by the broad feel of TGM/TAP acceleration without copying TAP's exact gravity table or its non-monotonic dips.
+This curve is intentionally smooth and monotonic while still reaching a strong pre-20G pace before the final jump to 20G.
 
 Useful checkpoints:
 
@@ -961,25 +961,9 @@ The desired end state is:
 
 ---
 
-### 22. Reference Snapshot (Web)
+### 22. Short Summary
 
-The concrete TGM2/TAP values above are based on community reverse-engineered references and wiki summaries:
-
-- https://tetris.wiki/wiki/Tetris_The_Absolute_The_Grand_Master_2
-- https://harddrop.com/wiki/ARS
-- https://harddrop.com/wiki/TGM_randomizer
-- https://tetris.wiki/wiki/Drop
-- https://tetris.wiki/wiki/TGM_Guide
-- https://tetris.wiki/wiki/Tetris_The_Grand_Master_3_Terror-Instinct
-- https://tetris.wiki/wiki/Tetris_The_Grand_Master_Ace
-
-These should be treated as the baseline spec for this project unless contradicted by stronger primary evidence.
-
----
-
-### 23. Short Summary
-
-This project is a TAP/TGM2-ARS-inspired falling-block engine with a theme system whose artistic center is a white-noise presentation.
+This project is a falling-block engine with a theme system whose artistic center is a white-noise presentation.
 
 Its defining technical principle is that solid mode and noise mode must share the same gameplay, the same motion model, the same object model, and the same rendering structure.
 
