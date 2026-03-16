@@ -59,7 +59,7 @@ export function createGameAudio(): GameAudio {
     if (context === null) {
       context = new window.AudioContext();
       masterGain = context.createGain();
-      masterGain.gain.value = 0.18;
+      masterGain.gain.value = 1;
       masterGain.connect(context.destination);
     }
 
