@@ -309,7 +309,7 @@ Rules:
   - `levelMultiplier = (100 + piecesBeforeLock) / 100`
 - a bravo applies a `x4` multiplier
 - if no manual shake has been used since the previous line clear, the next line clear receives a `x2` no-shake reward
-- using manual shake removes that reward for the next line clear only; after a line clear resolves, the reward state resets
+- using manual shake or auto shake removes that reward for the next line clear only; after a line clear resolves, the reward state resets
 - combo, soft-drop, hard-drop-distance, sonic-drop, and speed bonuses do not exist
 
 Recommended formula:
@@ -398,6 +398,7 @@ Development boot mechanism:
 - the top of that sidebar should show the game title (`NOISETET`)
 - normal mode should show the player controls in the sidebar
 - the sidebar should include a user-facing sound toggle
+- the sidebar should include a user-facing auto-shake assist toggle
 - the theme-toggle control (`V`) should remain debug-only and should not appear in normal mode
 - the debug state/statistics card should remain hidden in normal mode
 - debug modes may show the same title and controls, with the state/statistics card added below them
@@ -408,6 +409,15 @@ Development boot mechanism:
 - there should be no keyboard shortcut for sound toggle
 - the toggle should persist via local storage
 - gameplay sounds should respect that toggle immediately without affecting gameplay rules
+
+#### 9.6 Auto-shake assist
+
+- the application should expose an `AUTO SHAKE` sidebar toggle as an assist option
+- there should be no keyboard shortcut for auto shake
+- the toggle should persist via local storage
+- when enabled, auto shake should trigger the same shake action roughly once per second
+- auto shake should use the same presentation and scoring path as manual shake
+- auto shake should remain off by default
 
 ---
 
@@ -810,7 +820,7 @@ If an airborne hard drop locks immediately before a grounded frame can be displa
 
 The same active piece should not retrigger impact shake repeatedly just by briefly leaving and re-touching the surface.
 
-In the current prototype, the player may also trigger the same shake manually with `S`. This is unrestricted and does not alter movement rules, but it does disable the `x2` no-shake score reward for the next line clear.
+In the current prototype, the player may also trigger the same shake manually with `S`, or enable an automatic once-per-second shake assist from the sidebar. These do not alter movement rules, but they do disable the `x2` no-shake score reward for the next line clear.
 
 This is not merely decorative. It is part of how the noise concept becomes playable.
 

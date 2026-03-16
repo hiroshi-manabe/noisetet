@@ -72,7 +72,10 @@ const statsElement = document.querySelector<HTMLDivElement>("#stats");
 const statsCardElement = document.querySelector<HTMLElement>("#stats-card");
 const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-toggle-control");
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
+const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
 const SOUND_ENABLED_STORAGE_KEY = "noisetet:sound-enabled";
+const AUTO_SHAKE_ENABLED_STORAGE_KEY = "noisetet:auto-shake-enabled";
+const AUTO_SHAKE_INTERVAL_MS = 1000;
 
 if (
   shellElement === null ||
@@ -81,7 +84,8 @@ if (
   statsElement === null ||
   statsCardElement === null ||
   themeToggleControlElement === null ||
-  soundToggleElement === null
+  soundToggleElement === null ||
+  autoShakeToggleElement === null
 ) {
   throw new Error("App root elements not found.");
 }
@@ -93,6 +97,7 @@ const stats: HTMLDivElement = statsElement;
 const statsCard: HTMLElement = statsCardElement;
 const themeToggleControl: HTMLElement = themeToggleControlElement;
 const soundToggle: HTMLButtonElement = soundToggleElement;
+const autoShakeToggle: HTMLButtonElement = autoShakeToggleElement;
 
 const renderingContext = canvas.getContext("2d");
 if (renderingContext === null) {
@@ -147,6 +152,7 @@ let theme = createTheme(themeName, themeDimensions);
 const audio = createGameAudio();
 let soundEnabled = readSoundEnabled();
 audio.setEnabled(soundEnabled);
+let autoShakeEnabled = readAutoShakeEnabled();
 
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
@@ -154,6 +160,7 @@ let isPaused = bootSession.paused;
 let elapsedGameplayMs = 0;
 let accumulator = 0;
 let previousTime = performance.now();
+let autoShakeElapsedMs = 0;
 
 if (!debugMode) {
   statsCard.style.display = "none";
@@ -185,6 +192,26 @@ function writeSoundEnabled(enabled: boolean): void {
 
 function renderSoundToggle(): void {
   soundToggle.innerHTML = `<strong>SOUND</strong> ${soundEnabled ? "ON" : "OFF"}`;
+}
+
+function readAutoShakeEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(AUTO_SHAKE_ENABLED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeAutoShakeEnabled(enabled: boolean): void {
+  try {
+    window.localStorage.setItem(AUTO_SHAKE_ENABLED_STORAGE_KEY, String(enabled));
+  } catch {
+    // Ignore storage failures and keep the in-memory setting.
+  }
+}
+
+function renderAutoShakeToggle(): void {
+  autoShakeToggle.innerHTML = `<strong>AUTO SHAKE</strong> ${autoShakeEnabled ? "ON" : "OFF"}`;
 }
 
 window.addEventListener("keydown", (event) => {
@@ -224,6 +251,7 @@ window.addEventListener("keydown", (event) => {
     isPaused = false;
     elapsedGameplayMs = 0;
     accumulator = 0;
+    autoShakeElapsedMs = 0;
     pressedKeys.clear();
   }
 });
@@ -244,7 +272,14 @@ soundToggle.addEventListener("click", () => {
   renderSoundToggle();
 });
 
-function buildInputFrame(): InputFrame {
+autoShakeToggle.addEventListener("click", () => {
+  autoShakeEnabled = !autoShakeEnabled;
+  autoShakeElapsedMs = 0;
+  writeAutoShakeEnabled(autoShakeEnabled);
+  renderAutoShakeToggle();
+});
+
+function buildInputFrame(autoShakePulse: boolean): InputFrame {
   return {
     left: pressedKeys.has("ArrowLeft"),
     right: pressedKeys.has("ArrowRight"),
@@ -252,7 +287,7 @@ function buildInputFrame(): InputFrame {
     rotateCCW: pressedKeys.has("KeyZ") || pressedKeys.has("KeyC"),
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
-    shake: pressedKeys.has("KeyS"),
+    shake: pressedKeys.has("KeyS") || autoShakePulse,
   };
 }
 
@@ -658,7 +693,18 @@ function loop(now: number): void {
 
   while (accumulator >= FRAME_MS) {
     const previousState = state;
-    state = stepGame(state, buildInputFrame());
+    let autoShakePulse = false;
+    if (autoShakeEnabled && state.phase !== "GameOver") {
+      autoShakeElapsedMs += FRAME_MS;
+      if (autoShakeElapsedMs >= AUTO_SHAKE_INTERVAL_MS) {
+        autoShakeElapsedMs -= AUTO_SHAKE_INTERVAL_MS;
+        autoShakePulse = true;
+        presentationState = triggerImpactShake(presentationState, state);
+        audio.playImpact();
+      }
+    }
+
+    state = stepGame(state, buildInputFrame(autoShakePulse));
     presentationState = updatePresentationState(presentationState, previousState, state);
     const audioEvents = detectAudioEvents(previousState, state);
     if (audioEvents.playImpact) {
@@ -678,5 +724,6 @@ function loop(now: number): void {
 }
 
 renderSoundToggle();
+renderAutoShakeToggle();
 render(presentationState.view);
 requestAnimationFrame(loop);
