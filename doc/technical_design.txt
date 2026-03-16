@@ -850,6 +850,7 @@ When the run ends in noise mode:
 The project should keep sound minimal and event-driven.
 
 - use generated Web Audio synthesis rather than external sound files for the first implementation
+- the audio output chain may include a light master compressor so short event sounds read at a practical loudness without requiring unusually high system volume
 - the initial sound set should contain only:
   - an `impact` sound
   - a `line clear` sound

@@ -49,6 +49,7 @@ function createNoiseBuffer(context: AudioContext, durationSeconds: number): Audi
 export function createGameAudio(): GameAudio {
   let context: AudioContext | null = null;
   let masterGain: GainNode | null = null;
+  let masterCompressor: DynamicsCompressorNode | null = null;
   let impactNoiseBuffer: AudioBuffer | null = null;
   let lineNoiseBuffer: AudioBuffer | null = null;
   let enabled = true;
@@ -60,9 +61,16 @@ export function createGameAudio(): GameAudio {
 
     if (context === null) {
       context = new window.AudioContext();
+      masterCompressor = context.createDynamicsCompressor();
+      masterCompressor.threshold.value = -22;
+      masterCompressor.knee.value = 18;
+      masterCompressor.ratio.value = 3;
+      masterCompressor.attack.value = 0.003;
+      masterCompressor.release.value = 0.16;
       masterGain = context.createGain();
       masterGain.gain.value = 1;
-      masterGain.connect(context.destination);
+      masterGain.connect(masterCompressor);
+      masterCompressor.connect(context.destination);
     }
 
     return context;
@@ -138,23 +146,23 @@ export function createGameAudio(): GameAudio {
 
       const noiseFilter = ctx.createBiquadFilter();
       noiseFilter.type = "lowpass";
-      noiseFilter.frequency.setValueAtTime(420, now);
-      noiseFilter.frequency.exponentialRampToValueAtTime(140, now + 0.12);
+      noiseFilter.frequency.setValueAtTime(560, now);
+      noiseFilter.frequency.exponentialRampToValueAtTime(170, now + 0.16);
 
       const noiseGain = ctx.createGain();
       noiseGain.gain.setValueAtTime(0.0001, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.22, now + 0.003);
-      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+      noiseGain.gain.exponentialRampToValueAtTime(0.32, now + 0.003);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
 
       const thump = ctx.createOscillator();
       thump.type = "sine";
-      thump.frequency.setValueAtTime(90, now);
-      thump.frequency.exponentialRampToValueAtTime(46, now + 0.11);
+      thump.frequency.setValueAtTime(110, now);
+      thump.frequency.exponentialRampToValueAtTime(52, now + 0.14);
 
       const thumpGain = ctx.createGain();
       thumpGain.gain.setValueAtTime(0.0001, now);
-      thumpGain.gain.exponentialRampToValueAtTime(0.14, now + 0.004);
-      thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+      thumpGain.gain.exponentialRampToValueAtTime(0.2, now + 0.004);
+      thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
 
       noiseSource.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
@@ -164,9 +172,9 @@ export function createGameAudio(): GameAudio {
       thumpGain.connect(output);
 
       noiseSource.start(now);
-      noiseSource.stop(now + 0.13);
+      noiseSource.stop(now + 0.16);
       thump.start(now);
-      thump.stop(now + 0.11);
+      thump.stop(now + 0.14);
     },
 
     playLineClear(): void {
@@ -184,38 +192,53 @@ export function createGameAudio(): GameAudio {
 
       const tone = ctx.createOscillator();
       tone.type = "triangle";
-      tone.frequency.setValueAtTime(760, now);
-      tone.frequency.exponentialRampToValueAtTime(520, now + 0.16);
+      tone.frequency.setValueAtTime(980, now);
+      tone.frequency.exponentialRampToValueAtTime(620, now + 0.2);
 
       const toneGain = ctx.createGain();
       toneGain.gain.setValueAtTime(0.0001, now);
-      toneGain.gain.exponentialRampToValueAtTime(0.11, now + 0.01);
-      toneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      toneGain.gain.exponentialRampToValueAtTime(0.18, now + 0.008);
+      toneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+
+      const overtone = ctx.createOscillator();
+      overtone.type = "sine";
+      overtone.frequency.setValueAtTime(1480, now);
+      overtone.frequency.exponentialRampToValueAtTime(860, now + 0.18);
+
+      const overtoneGain = ctx.createGain();
+      overtoneGain.gain.setValueAtTime(0.0001, now);
+      overtoneGain.gain.exponentialRampToValueAtTime(0.08, now + 0.006);
+      overtoneGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
 
       const sparkle = ctx.createBufferSource();
       sparkle.buffer = getLineNoiseBuffer(ctx);
 
       const sparkleFilter = ctx.createBiquadFilter();
       sparkleFilter.type = "bandpass";
-      sparkleFilter.frequency.setValueAtTime(1800, now);
-      sparkleFilter.Q.value = 0.7;
+      sparkleFilter.frequency.setValueAtTime(2400, now);
+      sparkleFilter.Q.value = 0.8;
 
       const sparkleGain = ctx.createGain();
       sparkleGain.gain.setValueAtTime(0.0001, now);
-      sparkleGain.gain.exponentialRampToValueAtTime(0.05, now + 0.008);
-      sparkleGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+      sparkleGain.gain.exponentialRampToValueAtTime(0.09, now + 0.006);
+      sparkleGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
 
       tone.connect(toneGain);
       toneGain.connect(output);
+
+      overtone.connect(overtoneGain);
+      overtoneGain.connect(output);
 
       sparkle.connect(sparkleFilter);
       sparkleFilter.connect(sparkleGain);
       sparkleGain.connect(output);
 
       tone.start(now);
-      tone.stop(now + 0.19);
+      tone.stop(now + 0.24);
+      overtone.start(now);
+      overtone.stop(now + 0.18);
       sparkle.start(now);
-      sparkle.stop(now + 0.15);
+      sparkle.stop(now + 0.19);
     },
   };
 }
