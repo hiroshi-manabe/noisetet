@@ -7,6 +7,7 @@ export interface AudioEvents {
 
 export interface GameAudio {
   unlock(): void;
+  setEnabled(enabled: boolean): void;
   playImpact(): void;
   playLineClear(): void;
 }
@@ -50,6 +51,7 @@ export function createGameAudio(): GameAudio {
   let masterGain: GainNode | null = null;
   let impactNoiseBuffer: AudioBuffer | null = null;
   let lineNoiseBuffer: AudioBuffer | null = null;
+  let enabled = true;
 
   function getContext(): AudioContext | null {
     if (typeof window === "undefined" || typeof window.AudioContext === "undefined") {
@@ -114,7 +116,15 @@ export function createGameAudio(): GameAudio {
       void ctx.resume();
     },
 
+    setEnabled(nextEnabled: boolean): void {
+      enabled = nextEnabled;
+    },
+
     playImpact(): void {
+      if (!enabled) {
+        return;
+      }
+
       const ctx = getRunningContext();
       const output = getMasterGain();
       if (ctx === null || output === null) {
@@ -160,6 +170,10 @@ export function createGameAudio(): GameAudio {
     },
 
     playLineClear(): void {
+      if (!enabled) {
+        return;
+      }
+
       const ctx = getRunningContext();
       const output = getMasterGain();
       if (ctx === null || output === null) {

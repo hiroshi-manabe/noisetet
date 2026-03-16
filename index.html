@@ -76,6 +76,26 @@
         color: var(--accent);
       }
 
+      .brand {
+        display: grid;
+        gap: 8px;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: 0.14em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .brand p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
       .stat-row {
         display: flex;
         justify-content: space-between;
@@ -98,6 +118,25 @@
 
       .controls strong {
         color: var(--text);
+      }
+
+      .toggle-button {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--panel-line);
+        background: rgba(16, 19, 14, 0.8);
+        color: var(--text);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .toggle-button:hover {
+        background: rgba(24, 28, 21, 0.92);
+      }
+
+      .toggle-button strong {
+        color: var(--accent);
       }
 
       @media (max-width: 800px) {
@@ -127,7 +166,13 @@
         <canvas id="game" width="528" height="680"></canvas>
       </section>
       <aside class="sidebar" id="sidebar">
-        <section class="card">
+        <section class="card" id="title-card">
+          <div class="brand">
+            <h1>NOISETET</h1>
+            <p>Read motion, not shape.</p>
+          </div>
+        </section>
+        <section class="card" id="stats-card">
           <h2>State</h2>
           <div id="stats"></div>
         </section>
@@ -140,9 +185,13 @@
             <div><strong>S</strong> manual shake</div>
             <div><strong>Z / X / C</strong> rotate CCW / CW / CCW</div>
             <div><strong>P</strong> pause</div>
-            <div><strong>V</strong> toggle theme in debug</div>
+            <div id="theme-toggle-control"><strong>V</strong> toggle theme in debug</div>
             <div><strong>R</strong> restart after game over</div>
           </div>
+        </section>
+        <section class="card">
+          <h2>Sound</h2>
+          <button class="toggle-button" id="sound-toggle" type="button"></button>
         </section>
       </aside>
     </main>

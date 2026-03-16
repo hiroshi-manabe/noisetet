@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRandomizerState, fillQueue, nextRandomPiece } from "../src/core/index.js";
 
-describe("TGM randomizer", () => {
+describe("history randomizer", () => {
   it("never deals S, Z, or O as the first piece", () => {
     for (let seed = 1; seed <= 128; seed += 1) {
       const draw = nextRandomPiece(createRandomizerState(seed));

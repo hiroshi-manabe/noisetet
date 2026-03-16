@@ -392,6 +392,23 @@ Development boot mechanism:
 - a hidden persisted storage override may still exist as a fallback
 - if both environment and storage are present, the environment value takes precedence
 
+#### 9.4 Sidebar content
+
+- normal mode should keep the sidebar visible as a player-facing panel
+- the top of that sidebar should show the game title (`NOISETET`)
+- normal mode should show the player controls in the sidebar
+- the sidebar should include a user-facing sound toggle
+- the theme-toggle control (`V`) should remain debug-only and should not appear in normal mode
+- the debug state/statistics card should remain hidden in normal mode
+- debug modes may show the same title and controls, with the state/statistics card added below them
+
+#### 9.5 Sound control
+
+- the application should expose a single sound on/off toggle in the sidebar
+- there should be no keyboard shortcut for sound toggle
+- the toggle should persist via local storage
+- gameplay sounds should respect that toggle immediately without affecting gameplay rules
+
 ---
 
 ### 10. Timing and Simulation
@@ -781,6 +798,7 @@ When an active piece first makes grounded contact:
 - the frame should shake
 - the settled stack should shake
 - the active piece should shake because it still exists at first-contact time
+- the three preview pieces should shake with the same offset so the next queue participates in the impact/readability cue
 - the playfield surface and grid should remain fixed so the impact motion stays legible
 - the effect should be vertical only; there should be no left-right shake component
 - the motion should be a simple two-phase compression and return: first downward, then upward, then stop

@@ -69,12 +69,19 @@ const shellElement = document.querySelector<HTMLElement>("#shell");
 const sidebarElement = document.querySelector<HTMLElement>("#sidebar");
 const canvasElement = document.querySelector<HTMLCanvasElement>("#game");
 const statsElement = document.querySelector<HTMLDivElement>("#stats");
+const statsCardElement = document.querySelector<HTMLElement>("#stats-card");
+const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-toggle-control");
+const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
+const SOUND_ENABLED_STORAGE_KEY = "noisetet:sound-enabled";
 
 if (
   shellElement === null ||
   sidebarElement === null ||
   canvasElement === null ||
-  statsElement === null
+  statsElement === null ||
+  statsCardElement === null ||
+  themeToggleControlElement === null ||
+  soundToggleElement === null
 ) {
   throw new Error("App root elements not found.");
 }
@@ -83,6 +90,9 @@ const shell: HTMLElement = shellElement;
 const sidebar: HTMLElement = sidebarElement;
 const canvas: HTMLCanvasElement = canvasElement;
 const stats: HTMLDivElement = statsElement;
+const statsCard: HTMLElement = statsCardElement;
+const themeToggleControl: HTMLElement = themeToggleControlElement;
+const soundToggle: HTMLButtonElement = soundToggleElement;
 
 const renderingContext = canvas.getContext("2d");
 if (renderingContext === null) {
@@ -135,6 +145,8 @@ const debugMode = isDebugMode(bootSession.mode);
 let themeName: AppTheme["name"] = readTheme();
 let theme = createTheme(themeName, themeDimensions);
 const audio = createGameAudio();
+let soundEnabled = readSoundEnabled();
+audio.setEnabled(soundEnabled);
 
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
@@ -144,14 +156,35 @@ let accumulator = 0;
 let previousTime = performance.now();
 
 if (!debugMode) {
-  sidebar.style.display = "none";
-  shell.style.gridTemplateColumns = "1fr";
-  shell.style.width = "min(552px, calc(100vw - 16px))";
+  statsCard.style.display = "none";
+  themeToggleControl.style.display = "none";
+  shell.style.width = "min(1040px, calc(100vw - 16px))";
 }
 
 function applyTheme(nextThemeName: AppTheme["name"]): void {
   themeName = nextThemeName;
   theme = createTheme(themeName, themeDimensions);
+}
+
+function readSoundEnabled(): boolean {
+  try {
+    const stored = window.localStorage.getItem(SOUND_ENABLED_STORAGE_KEY);
+    return stored === null ? true : stored !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeSoundEnabled(enabled: boolean): void {
+  try {
+    window.localStorage.setItem(SOUND_ENABLED_STORAGE_KEY, String(enabled));
+  } catch {
+    // Ignore storage failures and keep the in-memory setting.
+  }
+}
+
+function renderSoundToggle(): void {
+  soundToggle.innerHTML = `<strong>SOUND</strong> ${soundEnabled ? "ON" : "OFF"}`;
 }
 
 window.addEventListener("keydown", (event) => {
@@ -201,6 +234,14 @@ window.addEventListener("keyup", (event) => {
 
 window.addEventListener("pointerdown", () => {
   audio.unlock();
+});
+
+soundToggle.addEventListener("click", () => {
+  audio.unlock();
+  soundEnabled = !soundEnabled;
+  audio.setEnabled(soundEnabled);
+  writeSoundEnabled(soundEnabled);
+  renderSoundToggle();
 });
 
 function buildInputFrame(): InputFrame {
@@ -485,13 +526,15 @@ function drawPreviews(view: PresentationView): void {
   view.queuePreviews.forEach((preview) => {
     const boxX = SIDE_PANEL_X + 16;
     const boxY = BOARD_Y + 34 + (preview.index + preview.yOffsetSlots) * 108;
+    const pieceX = boxX + view.shakeOffset.x;
+    const pieceY = boxY + view.shakeOffset.y;
 
     if (theme.showPreviewBoxChrome) {
       context.drawImage(theme.previewBoxSurface, boxX, boxY);
       context.strokeStyle = theme.previewBoxStroke;
       context.strokeRect(boxX + 0.5, boxY + 0.5, PREVIEW_BOX - 1, PREVIEW_BOX - 1);
     }
-    drawPreviewPiece(preview.type, boxX, boxY);
+    drawPreviewPiece(preview.type, pieceX, pieceY);
   });
 }
 
@@ -634,5 +677,6 @@ function loop(now: number): void {
   requestAnimationFrame(loop);
 }
 
+renderSoundToggle();
 render(presentationState.view);
 requestAnimationFrame(loop);
