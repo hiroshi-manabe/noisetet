@@ -1,0 +1,94 @@
+# Reveal Item Experiment
+
+## Goal
+
+Prototype a charge-based reveal pulse that can be evaluated in the noise theme without committing it to the main game design.
+
+## Status
+
+This document exists only for the `experiment/reveal-item-pulse` branch.
+The feature is experimental and may be discarded entirely.
+
+## Evaluation Scope
+
+The experiment should answer only these questions:
+
+- Does an earned reveal pulse improve the game?
+- Does it preserve enough of the motion-driven identity?
+- Does it feel better than manual shake and auto shake alone?
+
+If the answer is no, discard the branch.
+
+## Constraints
+
+- Normal mode remains unchanged during the experiment.
+- The feature is selectable only in debug modes.
+- The feature must work in both themes at the presentation layer, even if the practical value is mainly in the noise theme.
+- The implementation should be minimal and disposable.
+- Do not redesign scoring, progression, or core controls beyond what is needed to test the feature.
+
+## Minimal Prototype
+
+### Gameplay state
+
+Add only the minimum state needed:
+
+- `revealCharges`
+- `linesTowardNextRevealCharge`
+- `revealItemModeEnabled`
+
+### Accrual rule
+
+- Gain 1 charge every 4 cleared lines.
+- Carry line remainder toward the next charge.
+- Cap charges at 2.
+
+### Use rule
+
+- The player may spend 1 charge for an instant reveal pulse.
+- The pulse should not pause gameplay.
+- If no charge is available, the action does nothing.
+
+### Input/UI
+
+- Add a debug-only sidebar toggle for `ITEM MODE`.
+- Add a debug-only sidebar display for current reveal charges while item mode is enabled.
+- Add a temporary input for spending a charge only in this branch.
+- Avoid consuming an already important gameplay key unless necessary.
+
+### Presentation rule
+
+On use, apply a short reveal pulse to gameplay-relevant rendered roles:
+
+- active piece
+- settled stack
+- frame / wall
+- preview pieces
+
+The pulse should:
+
+- briefly increase legibility
+- decay quickly
+- not switch themes
+- not change gameplay rules
+
+### Sound
+
+Reuse existing sound paths if helpful, but do not add new audio assets just for the experiment.
+
+## Non-goals
+
+- No new item inventory system beyond reveal charges.
+- No multiple item types.
+- No changes to normal-mode UX.
+- No permanent addition to the public design doc unless the experiment succeeds.
+
+## Merge Criteria
+
+Promote the feature into the main design only if:
+
+- it materially improves playability
+- it does not make the game feel like ordinary falling-block play with a visibility power-up
+- it still feels architecturally clean
+
+Otherwise discard the branch.
