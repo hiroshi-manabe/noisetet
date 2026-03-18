@@ -22,7 +22,11 @@ export const EMPTY_INPUT: InputFrame = {
   up: false,
   down: false,
   shake: false,
+  reveal: false,
 };
+
+export const REVEAL_ITEM_LINES_PER_CHARGE = 4;
+export const REVEAL_ITEM_MAX_CHARGES = 2;
 
 const SPAWN_X: Record<Tetromino, number> = {
   I: 3,
@@ -92,6 +96,9 @@ export function createInitialGameState(options?: {
     pieceCount,
     score,
     manualShakeUsedSinceLastClear: false,
+    revealCharges: 0,
+    linesTowardNextRevealCharge: 0,
+    revealItemModeEnabled: false,
     gravityInternal: resolveGravityInternal(pieceCount, config),
     inputMemory: createInputMemory(),
     areFramesRemaining: config.timings.are,
@@ -391,6 +398,41 @@ function calculateScoreGain(
   return scaledScore * (bravo ? 4 : 1) * (noShakeReward ? 2 : 1);
 }
 
+function accrueRevealCharges(
+  state: GameState,
+  clearedLines: number,
+): Pick<GameState, "revealCharges" | "linesTowardNextRevealCharge"> {
+  if (!state.revealItemModeEnabled || clearedLines <= 0) {
+    return {
+      revealCharges: state.revealCharges,
+      linesTowardNextRevealCharge: state.linesTowardNextRevealCharge,
+    };
+  }
+
+  if (state.revealCharges >= REVEAL_ITEM_MAX_CHARGES) {
+    return {
+      revealCharges: state.revealCharges,
+      linesTowardNextRevealCharge: state.linesTowardNextRevealCharge,
+    };
+  }
+
+  let revealCharges = state.revealCharges;
+  let linesTowardNextRevealCharge = state.linesTowardNextRevealCharge + clearedLines;
+
+  while (
+    linesTowardNextRevealCharge >= REVEAL_ITEM_LINES_PER_CHARGE &&
+    revealCharges < REVEAL_ITEM_MAX_CHARGES
+  ) {
+    linesTowardNextRevealCharge -= REVEAL_ITEM_LINES_PER_CHARGE;
+    revealCharges += 1;
+  }
+
+  return {
+    revealCharges,
+    linesTowardNextRevealCharge,
+  };
+}
+
 function applyGravity(
   piece: ActivePiece,
   field: Field,
@@ -437,6 +479,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
       pendingClearedRows.length > 0 && isFieldEmpty(collapsedField),
       !state.manualShakeUsedSinceLastClear,
     );
+  const revealProgress = accrueRevealCharges(state, pendingClearedRows.length);
 
   if (pendingClearedRows.length > 0) {
     return {
@@ -447,6 +490,8 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
       pieceCount: nextPieceCount,
       score: nextScore,
       manualShakeUsedSinceLastClear: false,
+      revealCharges: revealProgress.revealCharges,
+      linesTowardNextRevealCharge: revealProgress.linesTowardNextRevealCharge,
       gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
       lineClearFramesRemaining: state.config.timings.lineClearDelay,
       pendingClearedRows,
@@ -461,6 +506,8 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
     pieceCount: nextPieceCount,
     score: nextScore,
     manualShakeUsedSinceLastClear: state.manualShakeUsedSinceLastClear,
+    revealCharges: revealProgress.revealCharges,
+    linesTowardNextRevealCharge: revealProgress.linesTowardNextRevealCharge,
     gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
     areFramesRemaining: state.config.timings.are,
     pendingClearedRows: [],
@@ -645,9 +692,17 @@ export function stepGame(state: GameState, input: InputFrame = EMPTY_INPUT): Gam
   const previousInput = state.inputMemory.previousInput;
   const nextInputMemory = updateInputMemory(state, input);
   const shakePressed = Boolean(input.shake) && !Boolean(previousInput.shake);
+  const revealPressed = Boolean(input.reveal) && !Boolean(previousInput.reveal);
+  const revealConsumed =
+    state.phase === "Active" &&
+    state.revealItemModeEnabled &&
+    revealPressed &&
+    state.revealCharges > 0;
   const nextState: GameState = {
     ...state,
-    manualShakeUsedSinceLastClear: state.manualShakeUsedSinceLastClear || shakePressed,
+    manualShakeUsedSinceLastClear:
+      state.manualShakeUsedSinceLastClear || shakePressed || revealConsumed,
+    revealCharges: revealConsumed ? state.revealCharges - 1 : state.revealCharges,
     inputMemory: nextInputMemory,
   };
 
@@ -665,4 +720,11 @@ export function stepGame(state: GameState, input: InputFrame = EMPTY_INPUT): Gam
     default:
       return nextState;
   }
+}
+
+export function setRevealItemModeEnabled(state: GameState, enabled: boolean): GameState {
+  return {
+    ...state,
+    revealItemModeEnabled: enabled,
+  };
 }

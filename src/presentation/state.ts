@@ -16,6 +16,7 @@ export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   queueSlideFrames: 8,
   impactShakeFrames: 8,
   impactShakeAmplitude: 8,
+  revealPulseFrames: 10,
   lineClearSlideDistanceCells: 12,
   activePieceMotionFrames: 4,
   entryMotionFrames: 6,
@@ -264,6 +265,7 @@ function buildView(
   gameState: GameState,
   queueSlideFramesRemaining: number,
   impactShakeFramesRemaining: number,
+  revealPulseFramesRemaining: number,
   activePieceMotionOffset: CellOffsetFloat,
   activePieceMotionFramesRemaining: number,
   entryMotionFramesRemaining: number,
@@ -274,6 +276,10 @@ function buildView(
     gameState.phase !== "GameOver" || config.gameOverRevealFrames <= 0
       ? 0
       : 1 - gameOverRevealFramesRemaining / config.gameOverRevealFrames;
+  const revealPulseStrength =
+    config.revealPulseFrames <= 0
+      ? 0
+      : Math.max(0, Math.min(1, revealPulseFramesRemaining / config.revealPulseFrames));
 
   return {
     phase: gameState.phase,
@@ -292,6 +298,9 @@ function buildView(
     gravityInternal: gameState.gravityInternal,
     lockDelayRemaining: gameState.activePiece?.lockDelayRemaining ?? null,
     shakeOffset: buildShakeOffset(impactShakeFramesRemaining, config),
+    revealPulseStrength,
+    revealCharges: gameState.revealCharges,
+    revealItemModeEnabled: gameState.revealItemModeEnabled,
     gameOverRevealProgress: Math.max(0, Math.min(1, gameOverRevealProgress)),
   };
 }
@@ -306,12 +315,13 @@ export function createPresentationState(
     settledField,
     queueSlideFramesRemaining: 0,
     impactShakeFramesRemaining: 0,
+    revealPulseFramesRemaining: 0,
     activePieceMotionFramesRemaining: 0,
     entryMotionFramesRemaining: 0,
     gameOverRevealFramesRemaining: 0,
     hasTriggeredImpactShakeForCurrentPiece: false,
     activePieceMotionOffset: ZERO_CELL_OFFSET,
-    view: buildView(settledField, gameState, 0, 0, ZERO_CELL_OFFSET, 0, 0, 0, config),
+    view: buildView(settledField, gameState, 0, 0, 0, ZERO_CELL_OFFSET, 0, 0, 0, config),
   };
 }
 
@@ -329,6 +339,7 @@ export function triggerImpactShake(
       gameState,
       presentationState.queueSlideFramesRemaining,
       impactShakeFramesRemaining,
+      presentationState.revealPulseFramesRemaining,
       presentationState.activePieceMotionOffset,
       presentationState.activePieceMotionFramesRemaining,
       presentationState.entryMotionFramesRemaining,
@@ -371,10 +382,16 @@ export function updatePresentationState(
     (currentGameState.phase === "ARE" || currentGameState.phase === "LineClear");
 
   const impactTriggered = firstGroundContactTriggered || airborneLockTriggered;
+  const revealTriggered =
+    currentGameState.revealCharges < previousGameState.revealCharges &&
+    currentGameState.revealItemModeEnabled;
 
   const impactShakeFramesRemaining = impactTriggered
     ? previousPresentationState.config.impactShakeFrames
     : Math.max(0, previousPresentationState.impactShakeFramesRemaining - 1);
+  const revealPulseFramesRemaining = revealTriggered
+    ? previousPresentationState.config.revealPulseFrames
+    : Math.max(0, previousPresentationState.revealPulseFramesRemaining - 1);
 
   const previousActivePiece = previousGameState.activePiece;
   const currentActivePiece = currentGameState.activePiece;
@@ -446,6 +463,7 @@ export function updatePresentationState(
     settledField,
     queueSlideFramesRemaining,
     impactShakeFramesRemaining,
+    revealPulseFramesRemaining,
     activePieceMotionFramesRemaining,
     entryMotionFramesRemaining,
     gameOverRevealFramesRemaining,
@@ -457,6 +475,7 @@ export function updatePresentationState(
       currentGameState,
       queueSlideFramesRemaining,
       impactShakeFramesRemaining,
+      revealPulseFramesRemaining,
       activePieceMotionOffset,
       activePieceMotionFramesRemaining,
       entryMotionFramesRemaining,

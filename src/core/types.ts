@@ -51,6 +51,7 @@ export interface InputFrame {
   up: boolean;
   down: boolean;
   shake?: boolean;
+  reveal?: boolean;
 }
 
 export interface InputMemory {
@@ -75,6 +76,9 @@ export interface GameState {
   pieceCount: number;
   score: number;
   manualShakeUsedSinceLastClear: boolean;
+  revealCharges: number;
+  linesTowardNextRevealCharge: number;
+  revealItemModeEnabled: boolean;
   gravityInternal: number;
   inputMemory: InputMemory;
   areFramesRemaining: number;

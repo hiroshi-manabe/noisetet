@@ -120,6 +120,12 @@
         color: var(--text);
       }
 
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+
       .toggle-button {
         width: 100%;
         padding: 10px 12px;
@@ -196,6 +202,9 @@
         <section class="card">
           <h2>Assist</h2>
           <button class="toggle-button" id="auto-shake-toggle" type="button"></button>
+          <div style="height: 8px"></div>
+          <button class="toggle-button" id="item-mode-toggle" type="button"></button>
+          <div class="hint" id="item-mode-status"></div>
         </section>
       </aside>
     </main>

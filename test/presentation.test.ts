@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createEmptyField, createInitialGameState, stepGame } from "../src/core/index.js";
+import {
+  createEmptyField,
+  createInitialGameState,
+  setRevealItemModeEnabled,
+  stepGame,
+} from "../src/core/index.js";
 import {
   createPresentationState,
   triggerImpactShake,
@@ -355,6 +360,33 @@ describe("presentation state", () => {
     expect(shakenState.view.activePiece).toEqual(gameState.activePiece);
     expect(shakenState.view.shakeOffset.x).toBe(0);
     expect(shakenState.view.shakeOffset.y).toBeGreaterThan(0);
+  });
+
+  it("starts a reveal pulse when a reveal charge is consumed", () => {
+    let previousGameState = setRevealItemModeEnabled(advanceToActiveState(), true);
+    previousGameState = {
+      ...previousGameState,
+      revealCharges: 1,
+    };
+
+    let presentationState = createPresentationState(previousGameState);
+    const currentGameState = stepGame(previousGameState, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: false,
+      reveal: true,
+    });
+    presentationState = updatePresentationState(presentationState, previousGameState, currentGameState);
+
+    expect(currentGameState.revealCharges).toBe(0);
+    expect(presentationState.revealPulseFramesRemaining).toBe(
+      presentationState.config.revealPulseFrames,
+    );
+    expect(presentationState.view.revealPulseStrength).toBe(1);
+    expect(presentationState.view.revealCharges).toBe(0);
   });
 
   it("starts a deterministic game-over reveal in presentation state", () => {

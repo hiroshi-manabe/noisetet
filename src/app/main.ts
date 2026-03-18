@@ -2,6 +2,8 @@ import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
   getCellsForPiece,
+  REVEAL_ITEM_MAX_CHARGES,
+  setRevealItemModeEnabled,
   stepGame,
   type InputFrame,
   type Tetromino,
@@ -73,6 +75,8 @@ const statsCardElement = document.querySelector<HTMLElement>("#stats-card");
 const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-toggle-control");
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
 const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
+const itemModeToggleElement = document.querySelector<HTMLButtonElement>("#item-mode-toggle");
+const itemModeStatusElement = document.querySelector<HTMLDivElement>("#item-mode-status");
 const SOUND_ENABLED_STORAGE_KEY = "noisetet:sound-enabled";
 const AUTO_SHAKE_ENABLED_STORAGE_KEY = "noisetet:auto-shake-enabled";
 const AUTO_SHAKE_INTERVAL_MS = 1000;
@@ -85,7 +89,9 @@ if (
   statsCardElement === null ||
   themeToggleControlElement === null ||
   soundToggleElement === null ||
-  autoShakeToggleElement === null
+  autoShakeToggleElement === null ||
+  itemModeToggleElement === null ||
+  itemModeStatusElement === null
 ) {
   throw new Error("App root elements not found.");
 }
@@ -98,6 +104,8 @@ const statsCard: HTMLElement = statsCardElement;
 const themeToggleControl: HTMLElement = themeToggleControlElement;
 const soundToggle: HTMLButtonElement = soundToggleElement;
 const autoShakeToggle: HTMLButtonElement = autoShakeToggleElement;
+const itemModeToggle: HTMLButtonElement = itemModeToggleElement;
+const itemModeStatus: HTMLDivElement = itemModeStatusElement;
 
 const renderingContext = canvas.getContext("2d");
 if (renderingContext === null) {
@@ -165,6 +173,8 @@ let autoShakeElapsedMs = 0;
 if (!debugMode) {
   statsCard.style.display = "none";
   themeToggleControl.style.display = "none";
+  itemModeToggle.style.display = "none";
+  itemModeStatus.style.display = "none";
   shell.style.width = "min(1040px, calc(100vw - 16px))";
 }
 
@@ -214,11 +224,22 @@ function renderAutoShakeToggle(): void {
   autoShakeToggle.innerHTML = `<strong>AUTO SHAKE</strong> ${autoShakeEnabled ? "ON" : "OFF"}`;
 }
 
+function renderItemModeControls(): void {
+  if (!debugMode) {
+    return;
+  }
+
+  itemModeToggle.innerHTML = `<strong>ITEM MODE</strong> ${state.revealItemModeEnabled ? "ON" : "OFF"}`;
+  itemModeStatus.textContent = state.revealItemModeEnabled
+    ? `REVEAL ${state.revealCharges}/${REVEAL_ITEM_MAX_CHARGES} \u00b7 Q USE`
+    : "Reveal charges disabled";
+}
+
 window.addEventListener("keydown", (event) => {
   audio.unlock();
 
   if (
-    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyS", "KeyV"].includes(
+    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyQ", "KeyS", "KeyV"].includes(
       event.code,
     )
   ) {
@@ -279,6 +300,15 @@ autoShakeToggle.addEventListener("click", () => {
   renderAutoShakeToggle();
 });
 
+itemModeToggle.addEventListener("click", () => {
+  if (!debugMode) {
+    return;
+  }
+
+  state = setRevealItemModeEnabled(state, !state.revealItemModeEnabled);
+  renderItemModeControls();
+});
+
 function buildInputFrame(autoShakePulse: boolean): InputFrame {
   return {
     left: pressedKeys.has("ArrowLeft"),
@@ -288,7 +318,25 @@ function buildInputFrame(autoShakePulse: boolean): InputFrame {
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
     shake: pressedKeys.has("KeyS") || autoShakePulse,
+    reveal: state.revealItemModeEnabled && pressedKeys.has("KeyQ"),
   };
+}
+
+function getRevealOverlayAlpha(view: PresentationView): number {
+  if (view.revealPulseStrength <= 0) {
+    return 0;
+  }
+
+  return (theme.name === "noise" ? 0.55 : 0.18) * view.revealPulseStrength;
+}
+
+function drawRevealOverlayRect(x: number, y: number, width: number, height: number, alpha: number): void {
+  if (alpha <= 0) {
+    return;
+  }
+
+  context.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
 }
 
 function hashToUnit(seed: number, x: number, y: number): number {
@@ -384,7 +432,27 @@ function drawBoardGrid(): void {
 function drawFrame(view: PresentationView): void {
   const originX = FRAME_X + view.shakeOffset.x;
   const originY = FRAME_Y + view.shakeOffset.y;
+  const revealAlpha = getRevealOverlayAlpha(view);
   context.drawImage(theme.frameSurface, originX, originY);
+
+  if (revealAlpha > 0) {
+    drawRevealOverlayRect(originX, originY, FRAME_OUTER_WIDTH, FRAME_THICKNESS, revealAlpha);
+    drawRevealOverlayRect(
+      originX,
+      originY + FRAME_OUTER_HEIGHT - FRAME_THICKNESS,
+      FRAME_OUTER_WIDTH,
+      FRAME_THICKNESS,
+      revealAlpha,
+    );
+    drawRevealOverlayRect(originX, originY + FRAME_THICKNESS, FRAME_THICKNESS, BOARD_HEIGHT, revealAlpha);
+    drawRevealOverlayRect(
+      originX + FRAME_OUTER_WIDTH - FRAME_THICKNESS,
+      originY + FRAME_THICKNESS,
+      FRAME_THICKNESS,
+      BOARD_HEIGHT,
+      revealAlpha,
+    );
+  }
 
   if (!shouldRevealGameOver(view)) {
     return;
@@ -414,6 +482,7 @@ function drawField(view: PresentationView): void {
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
   const revealGameOver = shouldRevealGameOver(view);
+  const revealAlpha = getRevealOverlayAlpha(view);
 
   for (let y = 1; y < view.field.length; y += 1) {
     for (let x = 0; x < view.field[y].length; x += 1) {
@@ -441,6 +510,16 @@ function drawField(view: PresentationView): void {
           view.gameOverRevealProgress,
         );
       }
+
+      if (revealAlpha > 0) {
+        drawRevealOverlayRect(
+          originX + x * CELL_SIZE,
+          originY + (y - 1) * CELL_SIZE,
+          CELL_SIZE,
+          CELL_SIZE,
+          revealAlpha,
+        );
+      }
     }
   }
 }
@@ -455,6 +534,7 @@ function drawActivePiece(view: PresentationView): void {
   const originY = BOARD_Y + view.shakeOffset.y;
   const quarterTurns = rotationToQuarterTurns(activePiece.rotation);
   const revealGameOver = shouldRevealGameOver(view);
+  const revealAlpha = getRevealOverlayAlpha(view);
 
   for (const cell of getCellsForPiece(activePiece)) {
     const y = activePiece.y + cell.y;
@@ -481,6 +561,16 @@ function drawActivePiece(view: PresentationView): void {
         view.gameOverRevealProgress,
       );
     }
+
+    if (revealAlpha > 0) {
+      drawRevealOverlayRect(
+        originX + (activePiece.x + cell.x + view.activePieceOffset.x) * CELL_SIZE,
+        originY + (y - 1 + view.activePieceOffset.y) * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE,
+        revealAlpha,
+      );
+    }
   }
 }
 
@@ -491,6 +581,7 @@ function drawLineClearRows(view: PresentationView): void {
 
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
+  const revealAlpha = getRevealOverlayAlpha(view);
 
   for (const row of view.lineClearRows) {
     if (row.y < 1) {
@@ -506,6 +597,16 @@ function drawLineClearRows(view: PresentationView): void {
         cell.sourceCellX,
         cell.sourceCellY,
       );
+
+      if (revealAlpha > 0) {
+        drawRevealOverlayRect(
+          originX + (cell.x + row.xOffsetCells) * CELL_SIZE,
+          originY + (row.y - 1) * CELL_SIZE,
+          CELL_SIZE,
+          CELL_SIZE,
+          revealAlpha,
+        );
+      }
     }
   }
 }
@@ -526,6 +627,7 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   const maxY = Math.max(...cells.map((cell) => cell.y));
   const offsetX = x + Math.floor((PREVIEW_BOX - (maxX + 1) * CELL_SIZE) / 2);
   const offsetY = y + Math.floor((PREVIEW_BOX - (maxY + 1) * CELL_SIZE) / 2);
+  const revealAlpha = getRevealOverlayAlpha(presentationState.view);
 
   for (const cell of cells) {
     drawMaterialCell(
@@ -536,6 +638,16 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
       cell.x,
       cell.y,
     );
+
+    if (revealAlpha > 0) {
+      drawRevealOverlayRect(
+        offsetX + cell.x * CELL_SIZE,
+        offsetY + cell.y * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE,
+        revealAlpha,
+      );
+    }
   }
 }
 
@@ -629,6 +741,8 @@ function renderStats(view: PresentationView, paused: boolean, elapsedMs: number)
     ["Score", String(view.score)],
     ["Pieces", String(view.pieceCount)],
     ["Gravity", String(view.gravityInternal)],
+    ["RevealMode", view.revealItemModeEnabled ? "on" : "off"],
+    ["Reveal", `${view.revealCharges}/${REVEAL_ITEM_MAX_CHARGES}`],
     ["Active", view.activePiece?.type ?? "none"],
     ["Lock", view.lockDelayRemaining === null ? "-" : String(view.lockDelayRemaining)],
   ]
@@ -706,6 +820,7 @@ function loop(now: number): void {
 
     state = stepGame(state, buildInputFrame(autoShakePulse));
     presentationState = updatePresentationState(presentationState, previousState, state);
+    renderItemModeControls();
     const audioEvents = detectAudioEvents(previousState, state);
     if (audioEvents.playImpact) {
       audio.playImpact();
@@ -725,5 +840,6 @@ function loop(now: number): void {
 
 renderSoundToggle();
 renderAutoShakeToggle();
+renderItemModeControls();
 render(presentationState.view);
 requestAnimationFrame(loop);

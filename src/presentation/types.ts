@@ -4,6 +4,7 @@ export interface PresentationConfig {
   queueSlideFrames: number;
   impactShakeFrames: number;
   impactShakeAmplitude: number;
+  revealPulseFrames: number;
   lineClearSlideDistanceCells: number;
   activePieceMotionFrames: number;
   entryMotionFrames: number;
@@ -62,6 +63,9 @@ export interface PresentationView {
   gravityInternal: number;
   lockDelayRemaining: number | null;
   shakeOffset: ShakeOffset;
+  revealPulseStrength: number;
+  revealCharges: number;
+  revealItemModeEnabled: boolean;
   gameOverRevealProgress: number;
 }
 
@@ -70,6 +74,7 @@ export interface PresentationState {
   settledField: SettledFieldView;
   queueSlideFramesRemaining: number;
   impactShakeFramesRemaining: number;
+  revealPulseFramesRemaining: number;
   activePieceMotionFramesRemaining: number;
   entryMotionFramesRemaining: number;
   gameOverRevealFramesRemaining: number;

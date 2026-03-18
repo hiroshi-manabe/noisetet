@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_TIMINGS,
+  REVEAL_ITEM_MAX_CHARGES,
   createEmptyField,
   createInitialGameState,
   getCellsForPiece,
   getGravityInternalForPieceCount,
+  setRevealItemModeEnabled,
   stepGame,
 } from "../src/core/index.js";
 
@@ -268,6 +270,120 @@ describe("game state", () => {
     });
 
     expect(state.score).toBe(400);
+  });
+
+  it("awards a reveal charge when a clear reaches the four-line threshold", () => {
+    const field = createEmptyField();
+    for (let x = 4; x < 10; x += 1) {
+      field[20][x] = "T";
+    }
+
+    let state = setRevealItemModeEnabled(createInitialGameState({ seed: 7, field }), true);
+    state = {
+      ...state,
+      linesTowardNextRevealCharge: 3,
+    };
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.pendingClearedRows).toHaveLength(1);
+    expect(state.revealCharges).toBe(1);
+    expect(state.linesTowardNextRevealCharge).toBe(0);
+  });
+
+  it("consumes a reveal charge and removes the no-shake score reward", () => {
+    let state = setRevealItemModeEnabled(advanceToActiveState(), true);
+    state = {
+      ...state,
+      revealCharges: 1,
+      linesTowardNextRevealCharge: 0,
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: false,
+      down: false,
+      reveal: true,
+    });
+
+    expect(state.revealCharges).toBe(0);
+    expect(state.manualShakeUsedSinceLastClear).toBe(true);
+  });
+
+  it("caps reveal charges at the configured maximum", () => {
+    const field = createEmptyField();
+    for (let x = 4; x < 10; x += 1) {
+      field[20][x] = "T";
+    }
+
+    let state = setRevealItemModeEnabled(
+      createInitialGameState({
+        seed: 7,
+        field,
+      }),
+      true,
+    );
+    state = {
+      ...state,
+      revealCharges: REVEAL_ITEM_MAX_CHARGES,
+      linesTowardNextRevealCharge: 3,
+    };
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = {
+      ...state,
+      activePiece: {
+        type: "I",
+        rotation: "spawn",
+        x: 0,
+        y: 0,
+        gravityAccumulator: 0,
+        grounded: false,
+        lockDelayRemaining: state.config.timings.lockDelay,
+      },
+    };
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.revealCharges).toBe(REVEAL_ITEM_MAX_CHARGES);
+    expect(state.linesTowardNextRevealCharge).toBe(3);
   });
 
   it("restores the no-shake score reward after a line clear", () => {
