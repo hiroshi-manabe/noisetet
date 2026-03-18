@@ -41,7 +41,7 @@ Add only the minimum state needed:
 
 - Gain 1 charge every 4 cleared lines.
 - Carry line remainder toward the next charge.
-- Cap charges at 2.
+- Cap charges at 3.
 
 ### Use rule
 
@@ -53,22 +53,23 @@ Add only the minimum state needed:
 
 - Add a debug-only sidebar toggle for `ITEM MODE`.
 - Add a debug-only sidebar display for current reveal charges while item mode is enabled.
-- Add a temporary input for spending a charge only in this branch.
+- Add a temporary input for spending a charge only in this branch: `D`.
 - Avoid consuming an already important gameplay key unless necessary.
 
 ### Presentation rule
 
-On use, apply a short reveal pulse to gameplay-relevant rendered roles:
+On use, apply a long dark reveal pulse to the same gameplay-relevant rendered roles that participate in shake:
 
 - active piece
 - settled stack
 - frame / wall
+- line-clear overlay
 - preview pieces
 
 The pulse should:
 
-- briefly increase legibility
-- decay quickly
+- darken those roles substantially at the start
+- fade slowly over roughly 2 to 3 seconds
 - not switch themes
 - not change gameplay rules
 

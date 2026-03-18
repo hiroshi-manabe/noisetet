@@ -16,7 +16,7 @@ export const DEFAULT_PRESENTATION_CONFIG: PresentationConfig = {
   queueSlideFrames: 8,
   impactShakeFrames: 8,
   impactShakeAmplitude: 8,
-  revealPulseFrames: 10,
+  revealPulseFrames: 150,
   lineClearSlideDistanceCells: 12,
   activePieceMotionFrames: 4,
   entryMotionFrames: 6,

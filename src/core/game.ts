@@ -26,7 +26,7 @@ export const EMPTY_INPUT: InputFrame = {
 };
 
 export const REVEAL_ITEM_LINES_PER_CHARGE = 4;
-export const REVEAL_ITEM_MAX_CHARGES = 2;
+export const REVEAL_ITEM_MAX_CHARGES = 3;
 
 const SPAWN_X: Record<Tetromino, number> = {
   I: 3,

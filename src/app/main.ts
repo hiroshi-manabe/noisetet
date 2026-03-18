@@ -73,6 +73,7 @@ const canvasElement = document.querySelector<HTMLCanvasElement>("#game");
 const statsElement = document.querySelector<HTMLDivElement>("#stats");
 const statsCardElement = document.querySelector<HTMLElement>("#stats-card");
 const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-toggle-control");
+const itemRevealControlElement = document.querySelector<HTMLElement>("#item-reveal-control");
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
 const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
 const itemModeToggleElement = document.querySelector<HTMLButtonElement>("#item-mode-toggle");
@@ -88,6 +89,7 @@ if (
   statsElement === null ||
   statsCardElement === null ||
   themeToggleControlElement === null ||
+  itemRevealControlElement === null ||
   soundToggleElement === null ||
   autoShakeToggleElement === null ||
   itemModeToggleElement === null ||
@@ -102,6 +104,7 @@ const canvas: HTMLCanvasElement = canvasElement;
 const stats: HTMLDivElement = statsElement;
 const statsCard: HTMLElement = statsCardElement;
 const themeToggleControl: HTMLElement = themeToggleControlElement;
+const itemRevealControl: HTMLElement = itemRevealControlElement;
 const soundToggle: HTMLButtonElement = soundToggleElement;
 const autoShakeToggle: HTMLButtonElement = autoShakeToggleElement;
 const itemModeToggle: HTMLButtonElement = itemModeToggleElement;
@@ -173,6 +176,7 @@ let autoShakeElapsedMs = 0;
 if (!debugMode) {
   statsCard.style.display = "none";
   themeToggleControl.style.display = "none";
+  itemRevealControl.style.display = "none";
   itemModeToggle.style.display = "none";
   itemModeStatus.style.display = "none";
   shell.style.width = "min(1040px, calc(100vw - 16px))";
@@ -231,7 +235,7 @@ function renderItemModeControls(): void {
 
   itemModeToggle.innerHTML = `<strong>ITEM MODE</strong> ${state.revealItemModeEnabled ? "ON" : "OFF"}`;
   itemModeStatus.textContent = state.revealItemModeEnabled
-    ? `REVEAL ${state.revealCharges}/${REVEAL_ITEM_MAX_CHARGES} \u00b7 Q USE`
+    ? `REVEAL ${state.revealCharges}/${REVEAL_ITEM_MAX_CHARGES} \u00b7 D USE`
     : "Reveal charges disabled";
 }
 
@@ -239,7 +243,7 @@ window.addEventListener("keydown", (event) => {
   audio.unlock();
 
   if (
-    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyP", "KeyQ", "KeyS", "KeyV"].includes(
+    ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyZ", "KeyX", "KeyC", "KeyD", "KeyP", "KeyS", "KeyV"].includes(
       event.code,
     )
   ) {
@@ -318,7 +322,7 @@ function buildInputFrame(autoShakePulse: boolean): InputFrame {
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
     shake: pressedKeys.has("KeyS") || autoShakePulse,
-    reveal: state.revealItemModeEnabled && pressedKeys.has("KeyQ"),
+    reveal: state.revealItemModeEnabled && pressedKeys.has("KeyD"),
   };
 }
 
@@ -327,7 +331,8 @@ function getRevealOverlayAlpha(view: PresentationView): number {
     return 0;
   }
 
-  return (theme.name === "noise" ? 0.55 : 0.18) * view.revealPulseStrength;
+  const easedStrength = Math.pow(view.revealPulseStrength, 0.75);
+  return (theme.name === "noise" ? 0.78 : 0.28) * easedStrength;
 }
 
 function drawRevealOverlayRect(x: number, y: number, width: number, height: number, alpha: number): void {
@@ -335,7 +340,7 @@ function drawRevealOverlayRect(x: number, y: number, width: number, height: numb
     return;
   }
 
-  context.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  context.fillStyle = `rgba(0, 0, 0, ${alpha})`;
   context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
 }
 
