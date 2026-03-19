@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   createEmptyField,
   createInitialGameState,
-  setRevealItemModeEnabled,
   stepGame,
 } from "../src/core/index.js";
 import {
@@ -363,7 +362,7 @@ describe("presentation state", () => {
   });
 
   it("starts a reveal pulse when a reveal charge is consumed", () => {
-    let previousGameState = setRevealItemModeEnabled(advanceToActiveState(), true);
+    let previousGameState = advanceToActiveState();
     previousGameState = {
       ...previousGameState,
       revealCharges: 1,

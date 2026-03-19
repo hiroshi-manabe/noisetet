@@ -7,7 +7,6 @@ import {
   createInitialGameState,
   getCellsForPiece,
   getGravityInternalForPieceCount,
-  setRevealItemModeEnabled,
   stepGame,
 } from "../src/core/index.js";
 
@@ -272,16 +271,16 @@ describe("game state", () => {
     expect(state.score).toBe(400);
   });
 
-  it("awards a reveal charge when a clear reaches the four-line threshold", () => {
+  it("awards a reveal charge when a lock reaches the ten-piece threshold", () => {
     const field = createEmptyField();
     for (let x = 4; x < 10; x += 1) {
       field[20][x] = "T";
     }
 
-    let state = setRevealItemModeEnabled(createInitialGameState({ seed: 7, field }), true);
+    let state = createInitialGameState({ seed: 7, field });
     state = {
       ...state,
-      linesTowardNextRevealCharge: 3,
+      piecesTowardNextRevealCharge: 9,
     };
 
     for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
@@ -312,15 +311,15 @@ describe("game state", () => {
 
     expect(state.pendingClearedRows).toHaveLength(1);
     expect(state.revealCharges).toBe(1);
-    expect(state.linesTowardNextRevealCharge).toBe(0);
+    expect(state.piecesTowardNextRevealCharge).toBe(0);
   });
 
   it("consumes a reveal charge and removes the no-shake score reward", () => {
-    let state = setRevealItemModeEnabled(advanceToActiveState(), true);
+    let state = advanceToActiveState();
     state = {
       ...state,
       revealCharges: 1,
-      linesTowardNextRevealCharge: 0,
+      piecesTowardNextRevealCharge: 0,
     };
 
     state = stepGame(state, {
@@ -343,17 +342,14 @@ describe("game state", () => {
       field[20][x] = "T";
     }
 
-    let state = setRevealItemModeEnabled(
-      createInitialGameState({
-        seed: 7,
-        field,
-      }),
-      true,
-    );
+    let state = createInitialGameState({
+      seed: 7,
+      field,
+    });
     state = {
       ...state,
       revealCharges: REVEAL_ITEM_MAX_CHARGES,
-      linesTowardNextRevealCharge: 3,
+      piecesTowardNextRevealCharge: 9,
     };
 
     for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
@@ -383,7 +379,7 @@ describe("game state", () => {
     });
 
     expect(state.revealCharges).toBe(REVEAL_ITEM_MAX_CHARGES);
-    expect(state.linesTowardNextRevealCharge).toBe(3);
+    expect(state.piecesTowardNextRevealCharge).toBe(9);
   });
 
   it("restores the no-shake score reward after a line clear", () => {

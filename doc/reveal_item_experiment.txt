@@ -21,8 +21,8 @@ If the answer is no, discard the branch.
 
 ## Constraints
 
-- Normal mode remains unchanged during the experiment.
-- The feature is selectable only in debug modes.
+- Item accrual and manual item use are always active in this branch.
+- Normal-mode UI remains as close to the main branch as possible aside from the added item display and auto-use control.
 - The feature must work in both themes at the presentation layer, even if the practical value is mainly in the noise theme.
 - The implementation should be minimal and disposable.
 - Do not redesign scoring, progression, or core controls beyond what is needed to test the feature.
@@ -34,13 +34,12 @@ If the answer is no, discard the branch.
 Add only the minimum state needed:
 
 - `revealCharges`
-- `linesTowardNextRevealCharge`
-- `revealItemModeEnabled`
+- `piecesTowardNextRevealCharge`
 
 ### Accrual rule
 
-- Gain 1 charge every 4 cleared lines.
-- Carry line remainder toward the next charge.
+- Gain 1 charge every 10 locked pieces.
+- Carry piece remainder toward the next charge.
 - Cap charges at 3.
 
 ### Use rule
@@ -51,10 +50,14 @@ Add only the minimum state needed:
 
 ### Input/UI
 
-- Add a debug-only sidebar toggle for `ITEM MODE`.
-- Add a debug-only sidebar display for current reveal charges while item mode is enabled.
-- Add a temporary input for spending a charge only in this branch: `D`.
-- Avoid consuming an already important gameplay key unless necessary.
+- Add a sidebar `AUTO USE` toggle.
+- Add a sidebar display with:
+  - a 10-step gauge for progress toward the next charge
+  - repeated item markers instead of a numeric charge count
+- Use `D` for manual item use in this branch.
+- Preserve `AUTO USE` across `R` restarts and reloads.
+- If `AUTO USE` is turned on while charges are available, spend 1 immediately.
+- After that, whenever a new charge is gained, spend 1 automatically.
 
 ### Presentation rule
 

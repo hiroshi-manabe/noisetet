@@ -65,7 +65,7 @@ export interface PresentationView {
   shakeOffset: ShakeOffset;
   revealPulseStrength: number;
   revealCharges: number;
-  revealItemModeEnabled: boolean;
+  revealChargeProgress: number;
   gameOverRevealProgress: number;
 }
 

@@ -300,7 +300,7 @@ function buildView(
     shakeOffset: buildShakeOffset(impactShakeFramesRemaining, config),
     revealPulseStrength,
     revealCharges: gameState.revealCharges,
-    revealItemModeEnabled: gameState.revealItemModeEnabled,
+    revealChargeProgress: gameState.piecesTowardNextRevealCharge,
     gameOverRevealProgress: Math.max(0, Math.min(1, gameOverRevealProgress)),
   };
 }
@@ -383,8 +383,7 @@ export function updatePresentationState(
 
   const impactTriggered = firstGroundContactTriggered || airborneLockTriggered;
   const revealTriggered =
-    currentGameState.revealCharges < previousGameState.revealCharges &&
-    currentGameState.revealItemModeEnabled;
+    currentGameState.revealCharges < previousGameState.revealCharges;
 
   const impactShakeFramesRemaining = impactTriggered
     ? previousPresentationState.config.impactShakeFrames

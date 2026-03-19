@@ -3,7 +3,7 @@ import {
   FIELD_WIDTH,
   getCellsForPiece,
   REVEAL_ITEM_MAX_CHARGES,
-  setRevealItemModeEnabled,
+  REVEAL_ITEM_PIECES_PER_CHARGE,
   stepGame,
   type InputFrame,
   type Tetromino,
@@ -76,10 +76,11 @@ const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-to
 const itemRevealControlElement = document.querySelector<HTMLElement>("#item-reveal-control");
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
 const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
-const itemModeToggleElement = document.querySelector<HTMLButtonElement>("#item-mode-toggle");
-const itemModeStatusElement = document.querySelector<HTMLDivElement>("#item-mode-status");
+const revealAutoUseToggleElement = document.querySelector<HTMLButtonElement>("#reveal-auto-use-toggle");
+const revealStatusElement = document.querySelector<HTMLDivElement>("#reveal-status");
 const SOUND_ENABLED_STORAGE_KEY = "noisetet:sound-enabled";
 const AUTO_SHAKE_ENABLED_STORAGE_KEY = "noisetet:auto-shake-enabled";
+const REVEAL_AUTO_USE_ENABLED_STORAGE_KEY = "noisetet:reveal-auto-use-enabled";
 const AUTO_SHAKE_INTERVAL_MS = 1000;
 
 if (
@@ -92,8 +93,8 @@ if (
   itemRevealControlElement === null ||
   soundToggleElement === null ||
   autoShakeToggleElement === null ||
-  itemModeToggleElement === null ||
-  itemModeStatusElement === null
+  revealAutoUseToggleElement === null ||
+  revealStatusElement === null
 ) {
   throw new Error("App root elements not found.");
 }
@@ -107,8 +108,8 @@ const themeToggleControl: HTMLElement = themeToggleControlElement;
 const itemRevealControl: HTMLElement = itemRevealControlElement;
 const soundToggle: HTMLButtonElement = soundToggleElement;
 const autoShakeToggle: HTMLButtonElement = autoShakeToggleElement;
-const itemModeToggle: HTMLButtonElement = itemModeToggleElement;
-const itemModeStatus: HTMLDivElement = itemModeStatusElement;
+const revealAutoUseToggle: HTMLButtonElement = revealAutoUseToggleElement;
+const revealStatus: HTMLDivElement = revealStatusElement;
 
 const renderingContext = canvas.getContext("2d");
 if (renderingContext === null) {
@@ -164,6 +165,8 @@ const audio = createGameAudio();
 let soundEnabled = readSoundEnabled();
 audio.setEnabled(soundEnabled);
 let autoShakeEnabled = readAutoShakeEnabled();
+let revealAutoUseEnabled = readRevealAutoUseEnabled();
+let pendingAutoRevealUse = false;
 
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
@@ -176,9 +179,6 @@ let autoShakeElapsedMs = 0;
 if (!debugMode) {
   statsCard.style.display = "none";
   themeToggleControl.style.display = "none";
-  itemRevealControl.style.display = "none";
-  itemModeToggle.style.display = "none";
-  itemModeStatus.style.display = "none";
   shell.style.width = "min(1040px, calc(100vw - 16px))";
 }
 
@@ -228,15 +228,38 @@ function renderAutoShakeToggle(): void {
   autoShakeToggle.innerHTML = `<strong>AUTO SHAKE</strong> ${autoShakeEnabled ? "ON" : "OFF"}`;
 }
 
-function renderItemModeControls(): void {
-  if (!debugMode) {
-    return;
+function readRevealAutoUseEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(REVEAL_AUTO_USE_ENABLED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
   }
+}
 
-  itemModeToggle.innerHTML = `<strong>ITEM MODE</strong> ${state.revealItemModeEnabled ? "ON" : "OFF"}`;
-  itemModeStatus.textContent = state.revealItemModeEnabled
-    ? `REVEAL ${state.revealCharges}/${REVEAL_ITEM_MAX_CHARGES} \u00b7 D USE`
-    : "Reveal charges disabled";
+function writeRevealAutoUseEnabled(enabled: boolean): void {
+  try {
+    window.localStorage.setItem(REVEAL_AUTO_USE_ENABLED_STORAGE_KEY, String(enabled));
+  } catch {
+    // Ignore storage failures and keep the in-memory setting.
+  }
+}
+
+function buildRevealGauge(progress: number): string {
+  const clampedProgress = Math.max(0, Math.min(REVEAL_ITEM_PIECES_PER_CHARGE, Math.floor(progress)));
+  return `${"■".repeat(clampedProgress)}${"□".repeat(REVEAL_ITEM_PIECES_PER_CHARGE - clampedProgress)}`;
+}
+
+function buildRevealItems(charges: number): string {
+  const clampedCharges = Math.max(0, Math.min(REVEAL_ITEM_MAX_CHARGES, Math.floor(charges)));
+  return clampedCharges === 0 ? "-" : "■".repeat(clampedCharges);
+}
+
+function renderRevealControls(): void {
+  revealAutoUseToggle.innerHTML = `<strong>AUTO USE</strong> ${revealAutoUseEnabled ? "ON" : "OFF"}`;
+  revealStatus.innerHTML = [
+    `<div>GAUGE ${buildRevealGauge(state.piecesTowardNextRevealCharge)}</div>`,
+    `<div>ITEMS ${buildRevealItems(state.revealCharges)}</div>`,
+  ].join("");
 }
 
 window.addEventListener("keydown", (event) => {
@@ -277,6 +300,7 @@ window.addEventListener("keydown", (event) => {
     elapsedGameplayMs = 0;
     accumulator = 0;
     autoShakeElapsedMs = 0;
+    pendingAutoRevealUse = revealAutoUseEnabled && state.revealCharges > 0;
     pressedKeys.clear();
   }
 });
@@ -304,16 +328,16 @@ autoShakeToggle.addEventListener("click", () => {
   renderAutoShakeToggle();
 });
 
-itemModeToggle.addEventListener("click", () => {
-  if (!debugMode) {
-    return;
+revealAutoUseToggle.addEventListener("click", () => {
+  revealAutoUseEnabled = !revealAutoUseEnabled;
+  writeRevealAutoUseEnabled(revealAutoUseEnabled);
+  if (revealAutoUseEnabled && state.revealCharges > 0 && state.phase !== "GameOver") {
+    pendingAutoRevealUse = true;
   }
-
-  state = setRevealItemModeEnabled(state, !state.revealItemModeEnabled);
-  renderItemModeControls();
+  renderRevealControls();
 });
 
-function buildInputFrame(autoShakePulse: boolean): InputFrame {
+function buildInputFrame(autoShakePulse: boolean, autoRevealUsePulse: boolean): InputFrame {
   return {
     left: pressedKeys.has("ArrowLeft"),
     right: pressedKeys.has("ArrowRight"),
@@ -322,7 +346,7 @@ function buildInputFrame(autoShakePulse: boolean): InputFrame {
     up: pressedKeys.has("ArrowUp"),
     down: pressedKeys.has("ArrowDown"),
     shake: pressedKeys.has("KeyS") || autoShakePulse,
-    reveal: state.revealItemModeEnabled && pressedKeys.has("KeyD"),
+    reveal: pressedKeys.has("KeyD") || autoRevealUsePulse,
   };
 }
 
@@ -746,8 +770,9 @@ function renderStats(view: PresentationView, paused: boolean, elapsedMs: number)
     ["Score", String(view.score)],
     ["Pieces", String(view.pieceCount)],
     ["Gravity", String(view.gravityInternal)],
-    ["RevealMode", view.revealItemModeEnabled ? "on" : "off"],
-    ["Reveal", `${view.revealCharges}/${REVEAL_ITEM_MAX_CHARGES}`],
+    ["RevealAuto", revealAutoUseEnabled ? "on" : "off"],
+    ["RevealGauge", `${view.revealChargeProgress}/${REVEAL_ITEM_PIECES_PER_CHARGE}`],
+    ["RevealItems", buildRevealItems(view.revealCharges)],
     ["Active", view.activePiece?.type ?? "none"],
     ["Lock", view.lockDelayRemaining === null ? "-" : String(view.lockDelayRemaining)],
   ]
@@ -813,6 +838,7 @@ function loop(now: number): void {
   while (accumulator >= FRAME_MS) {
     const previousState = state;
     let autoShakePulse = false;
+    let autoRevealUsePulse = false;
     if (autoShakeEnabled && state.phase !== "GameOver") {
       autoShakeElapsedMs += FRAME_MS;
       if (autoShakeElapsedMs >= AUTO_SHAKE_INTERVAL_MS) {
@@ -823,9 +849,17 @@ function loop(now: number): void {
       }
     }
 
-    state = stepGame(state, buildInputFrame(autoShakePulse));
+    if (pendingAutoRevealUse && state.phase !== "GameOver") {
+      autoRevealUsePulse = true;
+      pendingAutoRevealUse = false;
+    }
+
+    state = stepGame(state, buildInputFrame(autoShakePulse, autoRevealUsePulse));
     presentationState = updatePresentationState(presentationState, previousState, state);
-    renderItemModeControls();
+    if (revealAutoUseEnabled && state.revealCharges > previousState.revealCharges && state.phase !== "GameOver") {
+      pendingAutoRevealUse = true;
+    }
+    renderRevealControls();
     const audioEvents = detectAudioEvents(previousState, state);
     if (audioEvents.playImpact) {
       audio.playImpact();
@@ -845,6 +879,6 @@ function loop(now: number): void {
 
 renderSoundToggle();
 renderAutoShakeToggle();
-renderItemModeControls();
+renderRevealControls();
 render(presentationState.view);
 requestAnimationFrame(loop);

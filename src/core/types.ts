@@ -77,8 +77,7 @@ export interface GameState {
   score: number;
   manualShakeUsedSinceLastClear: boolean;
   revealCharges: number;
-  linesTowardNextRevealCharge: number;
-  revealItemModeEnabled: boolean;
+  piecesTowardNextRevealCharge: number;
   gravityInternal: number;
   inputMemory: InputMemory;
   areFramesRemaining: number;
