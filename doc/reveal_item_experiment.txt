@@ -51,9 +51,10 @@ Add only the minimum state needed:
 ### Input/UI
 
 - Add a sidebar `AUTO USE` toggle.
-- Add a sidebar display with:
+- Add an in-canvas HUD display with:
   - a 10-step gauge for progress toward the next charge
   - repeated item markers instead of a numeric charge count
+- Keep the sidebar focused on preferences and meta controls rather than gameplay state.
 - Use `D` for manual item use in this branch.
 - Preserve `AUTO USE` across `R` restarts and reloads.
 - If `AUTO USE` is turned on while charges are available, spend 1 immediately.

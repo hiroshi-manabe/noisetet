@@ -74,7 +74,7 @@ function createNoiseGlyphTexture(
   context.clearRect(0, 0, width, height);
   fillNoiseTexture(context, width, height, seedFromString(seedKey), {
     binary: true,
-    whiteProbability: 0.90,
+    whiteProbability: 1.0,
     blockSizeCssPixels: 1,
     pixelsPerCssPixel: 1,
   });
@@ -137,6 +137,7 @@ export interface HudTextures {
   labels: {
     score: HTMLCanvasElement;
     pieces: HTMLCanvasElement;
+    reveal: HTMLCanvasElement;
   };
   overlayLabels: {
     paused: HTMLCanvasElement;
@@ -161,6 +162,7 @@ export function createHudTextures(mode: HudTextureMode): HudTextures {
     labels: {
       score: createLabelTexture("SCORE", mode),
       pieces: createLabelTexture("PIECES", mode),
+      reveal: createLabelTexture("REVEAL", mode),
     },
     overlayLabels: {
       paused: createLabelTexture("PAUSED", mode, OVERLAY_LABEL_WIDTH),

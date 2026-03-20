@@ -58,12 +58,16 @@ const SIDE_PANEL_X = FRAME_X + FRAME_OUTER_WIDTH + 16;
 const HUD_PANEL_X = SIDE_PANEL_X;
 const HUD_PANEL_Y = BOARD_Y + PREVIEW_PANEL_HEIGHT + 12;
 const HUD_PANEL_WIDTH = PREVIEW_PANEL_WIDTH;
-const HUD_PANEL_HEIGHT = 212;
+const HUD_PANEL_HEIGHT = 280;
 const SCORE_DISPLAY_DIGITS = 5;
 const SCORE_DISPLAY_MAX = 99999;
 const PIECES_DISPLAY_DIGITS = 3;
 const PIECES_DISPLAY_MAX = 999;
 const GAME_OVER_REVEAL_BLACK_COVERAGE = 0.4;
+const REVEAL_GAUGE_WIDTH = 102;
+const REVEAL_GAUGE_HEIGHT = 14;
+const REVEAL_ITEM_TOKEN_SIZE = 14;
+const REVEAL_ITEM_TOKEN_GAP = 8;
 
 const pressedKeys = new Set<string>();
 
@@ -77,7 +81,6 @@ const itemRevealControlElement = document.querySelector<HTMLElement>("#item-reve
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
 const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
 const revealAutoUseToggleElement = document.querySelector<HTMLButtonElement>("#reveal-auto-use-toggle");
-const revealStatusElement = document.querySelector<HTMLDivElement>("#reveal-status");
 const SOUND_ENABLED_STORAGE_KEY = "noisetet:sound-enabled";
 const AUTO_SHAKE_ENABLED_STORAGE_KEY = "noisetet:auto-shake-enabled";
 const REVEAL_AUTO_USE_ENABLED_STORAGE_KEY = "noisetet:reveal-auto-use-enabled";
@@ -93,8 +96,7 @@ if (
   itemRevealControlElement === null ||
   soundToggleElement === null ||
   autoShakeToggleElement === null ||
-  revealAutoUseToggleElement === null ||
-  revealStatusElement === null
+  revealAutoUseToggleElement === null
 ) {
   throw new Error("App root elements not found.");
 }
@@ -109,7 +111,6 @@ const itemRevealControl: HTMLElement = itemRevealControlElement;
 const soundToggle: HTMLButtonElement = soundToggleElement;
 const autoShakeToggle: HTMLButtonElement = autoShakeToggleElement;
 const revealAutoUseToggle: HTMLButtonElement = revealAutoUseToggleElement;
-const revealStatus: HTMLDivElement = revealStatusElement;
 
 const renderingContext = canvas.getContext("2d");
 if (renderingContext === null) {
@@ -244,11 +245,6 @@ function writeRevealAutoUseEnabled(enabled: boolean): void {
   }
 }
 
-function buildRevealGauge(progress: number): string {
-  const clampedProgress = Math.max(0, Math.min(REVEAL_ITEM_PIECES_PER_CHARGE, Math.floor(progress)));
-  return `${"■".repeat(clampedProgress)}${"□".repeat(REVEAL_ITEM_PIECES_PER_CHARGE - clampedProgress)}`;
-}
-
 function buildRevealItems(charges: number): string {
   const clampedCharges = Math.max(0, Math.min(REVEAL_ITEM_MAX_CHARGES, Math.floor(charges)));
   return clampedCharges === 0 ? "-" : "■".repeat(clampedCharges);
@@ -256,10 +252,6 @@ function buildRevealItems(charges: number): string {
 
 function renderRevealControls(): void {
   revealAutoUseToggle.innerHTML = `<strong>AUTO USE</strong> ${revealAutoUseEnabled ? "ON" : "OFF"}`;
-  revealStatus.innerHTML = [
-    `<div>GAUGE ${buildRevealGauge(state.piecesTowardNextRevealCharge)}</div>`,
-    `<div>ITEMS ${buildRevealItems(state.revealCharges)}</div>`,
-  ].join("");
 }
 
 window.addEventListener("keydown", (event) => {
@@ -736,6 +728,49 @@ function drawCenteredLabel(texture: HTMLCanvasElement, centerX: number, y: numbe
   context.drawImage(texture, Math.round(centerX - texture.width / 2), y);
 }
 
+function drawRevealGauge(view: PresentationView, x: number, y: number): void {
+  const startX = Math.round(x + (HUD_PANEL_WIDTH - 16 - REVEAL_GAUGE_WIDTH) / 2);
+  const progress = Math.max(0, Math.min(REVEAL_ITEM_PIECES_PER_CHARGE, view.revealChargeProgress));
+  const fillWidth = Math.round((progress / REVEAL_ITEM_PIECES_PER_CHARGE) * (REVEAL_GAUGE_WIDTH - 4));
+
+  context.strokeStyle = theme.name === "noise" ? "rgba(238, 241, 223, 0.9)" : "rgba(73, 82, 59, 0.95)";
+  context.lineWidth = 1;
+  context.strokeRect(startX + 0.5, y + 0.5, REVEAL_GAUGE_WIDTH - 1, REVEAL_GAUGE_HEIGHT - 1);
+
+  context.fillStyle = theme.name === "noise" ? "rgba(238, 241, 223, 0.22)" : "rgba(73, 82, 59, 0.22)";
+  context.fillRect(startX + 2, y + 2, REVEAL_GAUGE_WIDTH - 4, REVEAL_GAUGE_HEIGHT - 4);
+
+  if (fillWidth > 0) {
+    context.fillStyle = "#ffffff";
+    context.fillRect(startX + 2, y + 2, fillWidth, REVEAL_GAUGE_HEIGHT - 4);
+  }
+}
+
+function drawRevealItems(view: PresentationView, x: number, y: number): void {
+  if (view.revealCharges <= 0) {
+    context.fillStyle = "#ffffff";
+    context.font = 'bold 16px "Iosevka Term", "SFMono-Regular", Menlo, Consolas, monospace';
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("-", x + HUD_PANEL_WIDTH / 2 - 8, y + REVEAL_ITEM_TOKEN_SIZE / 2);
+    return;
+  }
+
+  const totalWidth =
+    view.revealCharges * REVEAL_ITEM_TOKEN_SIZE +
+    Math.max(0, view.revealCharges - 1) * REVEAL_ITEM_TOKEN_GAP;
+  let tokenX = Math.round(x + (HUD_PANEL_WIDTH - 16 - totalWidth) / 2);
+
+  for (let index = 0; index < view.revealCharges; index += 1) {
+    context.strokeStyle = theme.name === "noise" ? "rgba(238, 241, 223, 0.8)" : "rgba(73, 82, 59, 0.95)";
+    context.lineWidth = 1;
+    context.strokeRect(tokenX + 0.5, y + 0.5, REVEAL_ITEM_TOKEN_SIZE - 1, REVEAL_ITEM_TOKEN_SIZE - 1);
+    context.fillStyle = "#ffffff";
+    context.fillRect(tokenX + 2, y + 2, REVEAL_ITEM_TOKEN_SIZE - 4, REVEAL_ITEM_TOKEN_SIZE - 4);
+    tokenX += REVEAL_ITEM_TOKEN_SIZE + REVEAL_ITEM_TOKEN_GAP;
+  }
+}
+
 function drawUserHud(view: PresentationView): void {
   if (theme.showHudPanelChrome) {
     context.drawImage(theme.hudPanelSurface, HUD_PANEL_X, HUD_PANEL_Y);
@@ -758,6 +793,10 @@ function drawUserHud(view: PresentationView): void {
     PIECES_DISPLAY_DIGITS,
     PIECES_DISPLAY_MAX,
   );
+
+  drawHudLabel(theme.hudTextures.labels.reveal, labelX, HUD_PANEL_Y + 188);
+  drawRevealGauge(view, HUD_PANEL_X + 8, HUD_PANEL_Y + 226);
+  drawRevealItems(view, HUD_PANEL_X + 8, HUD_PANEL_Y + 248);
 }
 
 function renderStats(view: PresentationView, paused: boolean, elapsedMs: number): void {
