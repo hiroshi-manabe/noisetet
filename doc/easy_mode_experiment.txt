@@ -1,0 +1,39 @@
+## Easy Mode Experiment
+
+Branch:
+- `experiment/easy-mode-pulse`
+
+Goal:
+- test whether a mild periodic visibility assist can broaden playability without collapsing the game into ordinary readable play
+
+Public mode labels:
+- `NORMAL`
+- `MAX`
+- `EASY`
+
+Current experiment:
+- `EASY` uses standard gravity rules
+- every ~2 seconds, the same gameplay-relevant structures used by the reveal darkening pass receive a short dark visibility pulse
+- target layers:
+  - frame
+  - active piece
+  - settled stack
+  - line-clear overlay
+  - preview pieces
+- board surface remains unchanged
+
+Current tuning:
+- interval: `2000 ms`
+- pulse duration: `2000 ms`
+- pulse shape: 1 second gradual darkening, then 1 second gradual fade
+- peak dark overlay alpha: `0.10`
+
+Mode-selection behavior:
+- the public `MODE` selector always changes the next-run mode
+- the selected mode applies on the next restart/start, not immediately mid-run
+- the selected mode is persisted across reloads and becomes the initial public run mode on page load
+
+Constraints:
+- no gameplay-rule changes beyond the public start-mode selection
+- scoring remains unchanged
+- this is an experiment, not yet part of the main design spec

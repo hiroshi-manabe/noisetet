@@ -40,6 +40,8 @@ import {
   type PresentationView,
 } from "../presentation/index.js";
 
+type PublicStartMode = "normal" | "gravity-max" | "easy";
+
 const VISIBLE_ROWS = FIELD_HEIGHT - 1;
 const CELL_SIZE = 30;
 const BOARD_X = 36;
@@ -69,12 +71,17 @@ const REVEAL_GAUGE_WIDTH = 102;
 const REVEAL_GAUGE_HEIGHT = 14;
 const REVEAL_ITEM_TOKEN_SIZE = 14;
 const REVEAL_ITEM_TOKEN_GAP = 8;
+const EASY_PULSE_INTERVAL_MS = 2000;
+const EASY_PULSE_DURATION_MS = 2000;
+const EASY_PULSE_ATTACK_RATIO = 0.5;
+const EASY_PULSE_BLACK_ALPHA = 0.10;
 
 const pressedKeys = new Set<string>();
 
 const shellElement = document.querySelector<HTMLElement>("#shell");
 const sidebarElement = document.querySelector<HTMLElement>("#sidebar");
 const canvasElement = document.querySelector<HTMLCanvasElement>("#game");
+const startCardElement = document.querySelector<HTMLElement>("#start-card");
 const statsElement = document.querySelector<HTMLDivElement>("#stats");
 const statsCardElement = document.querySelector<HTMLElement>("#stats-card");
 const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-toggle-control");
@@ -83,6 +90,7 @@ const startModeToggleElement = document.querySelector<HTMLButtonElement>("#start
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
 const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
 const revealAutoUseToggleElement = document.querySelector<HTMLButtonElement>("#reveal-auto-use-toggle");
+const PUBLIC_START_MODE_STORAGE_KEY = "noisetet:public-start-mode";
 const SOUND_ENABLED_STORAGE_KEY = "noisetet:sound-enabled";
 const AUTO_SHAKE_ENABLED_STORAGE_KEY = "noisetet:auto-shake-enabled";
 const REVEAL_AUTO_USE_ENABLED_STORAGE_KEY = "noisetet:reveal-auto-use-enabled";
@@ -92,6 +100,7 @@ if (
   shellElement === null ||
   sidebarElement === null ||
   canvasElement === null ||
+  startCardElement === null ||
   statsElement === null ||
   statsCardElement === null ||
   themeToggleControlElement === null ||
@@ -107,6 +116,7 @@ if (
 const shell: HTMLElement = shellElement;
 const sidebar: HTMLElement = sidebarElement;
 const canvas: HTMLCanvasElement = canvasElement;
+const startCard: HTMLElement = startCardElement;
 const stats: HTMLDivElement = statsElement;
 const statsCard: HTMLElement = statsCardElement;
 const themeToggleControl: HTMLElement = themeToggleControlElement;
@@ -162,8 +172,35 @@ function readTheme(): AppTheme["name"] {
   }
 }
 
+function createRunStateForPublicStartMode(startMode: PublicStartMode): ReturnType<typeof createBootSession>["state"] {
+  const seed = resolveBootSeed("normal");
+  return createBootSession(startMode === "gravity-max" ? "debug20g" : "normal", seed).state;
+}
+
+function readPublicStartMode(): PublicStartMode {
+  try {
+    const stored = window.localStorage.getItem(PUBLIC_START_MODE_STORAGE_KEY);
+    if (stored === "gravity-max" || stored === "easy" || stored === "normal") {
+      return stored;
+    }
+  } catch {
+    // Ignore storage failures and use the default mode.
+  }
+
+  return "normal";
+}
+
+function writePublicStartMode(mode: PublicStartMode): void {
+  try {
+    window.localStorage.setItem(PUBLIC_START_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Ignore storage failures and keep the in-memory setting.
+  }
+}
+
 const bootSession = createBootSession(readBootMode());
 const debugMode = isDebugMode(bootSession.mode);
+const initialPublicStartMode: PublicStartMode = debugMode ? "normal" : readPublicStartMode();
 let themeName: AppTheme["name"] = readTheme();
 let theme = createTheme(themeName, themeDimensions);
 const audio = createGameAudio();
@@ -173,19 +210,24 @@ let autoShakeEnabled = readAutoShakeEnabled();
 let revealAutoUseEnabled = readRevealAutoUseEnabled();
 let pendingAutoRevealUse = false;
 
-let state = bootSession.state;
+let state = debugMode ? bootSession.state : createRunStateForPublicStartMode(initialPublicStartMode);
 let presentationState: PresentationState = createPresentationState(state);
 let isPaused = bootSession.paused;
-let publicStartMode: "normal" | "gravity-max" = "normal";
+let publicStartMode: PublicStartMode = initialPublicStartMode;
+let activePublicRunMode: PublicStartMode = initialPublicStartMode;
 let elapsedGameplayMs = 0;
 let accumulator = 0;
 let previousTime = performance.now();
 let autoShakeElapsedMs = 0;
+let easyPulseElapsedMs = 0;
+let easyPulseRemainingMs = 0;
 
 if (!debugMode) {
   statsCard.style.display = "none";
   themeToggleControl.style.display = "none";
   shell.style.width = "min(1040px, calc(100vw - 16px))";
+} else {
+  startCard.style.display = "none";
 }
 
 function applyTheme(nextThemeName: AppTheme["name"]): void {
@@ -193,9 +235,20 @@ function applyTheme(nextThemeName: AppTheme["name"]): void {
   theme = createTheme(themeName, themeDimensions);
 }
 
-function createRunStateForPublicStartMode(startMode: "normal" | "gravity-max"): ReturnType<typeof createBootSession>["state"] {
-  const seed = resolveBootSeed("normal");
-  return createBootSession(startMode === "gravity-max" ? "debug20g" : "normal", seed).state;
+function isStartModeSelectable(): boolean {
+  return !debugMode;
+}
+
+function getNextPublicStartMode(mode: PublicStartMode): PublicStartMode {
+  switch (mode) {
+    case "normal":
+      return "gravity-max";
+    case "gravity-max":
+      return "easy";
+    case "easy":
+    default:
+      return "normal";
+  }
 }
 
 function readSoundEnabled(): boolean {
@@ -240,8 +293,10 @@ function renderAutoShakeToggle(): void {
 }
 
 function renderStartModeToggle(): void {
-  startModeToggle.innerHTML = `<strong>MODE</strong> ${publicStartMode === "gravity-max" ? "MAX" : "NORMAL"}`;
-  startModeToggle.disabled = state.pieceCount > 0 && state.phase !== "GameOver";
+  const label =
+    publicStartMode === "gravity-max" ? "MAX" : publicStartMode === "easy" ? "EASY" : "NORMAL";
+  startModeToggle.innerHTML = `<strong>MODE</strong> ${label}`;
+  startModeToggle.disabled = !isStartModeSelectable();
 }
 
 function readRevealAutoUseEnabled(): boolean {
@@ -301,6 +356,7 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (state.phase === "GameOver" && event.code === "KeyR") {
+    activePublicRunMode = publicStartMode;
     state = debugMode
       ? createBootSession(bootSession.mode).state
       : createRunStateForPublicStartMode(publicStartMode);
@@ -309,6 +365,8 @@ window.addEventListener("keydown", (event) => {
     elapsedGameplayMs = 0;
     accumulator = 0;
     autoShakeElapsedMs = 0;
+    easyPulseElapsedMs = 0;
+    easyPulseRemainingMs = 0;
     pendingAutoRevealUse = revealAutoUseEnabled && state.revealCharges > 0;
     pressedKeys.clear();
   }
@@ -323,11 +381,12 @@ window.addEventListener("pointerdown", () => {
 });
 
 startModeToggle.addEventListener("click", () => {
-  if (debugMode || (state.pieceCount > 0 && state.phase !== "GameOver")) {
+  if (!isStartModeSelectable()) {
     return;
   }
 
-  publicStartMode = publicStartMode === "normal" ? "gravity-max" : "normal";
+  publicStartMode = getNextPublicStartMode(publicStartMode);
+  writePublicStartMode(publicStartMode);
   renderStartModeToggle();
 });
 
@@ -384,6 +443,30 @@ function drawRevealOverlayRect(x: number, y: number, width: number, height: numb
 
   context.fillStyle = `rgba(0, 0, 0, ${alpha})`;
   context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+}
+
+function getEasyModeOverlayAlpha(): number {
+  if (debugMode || activePublicRunMode !== "easy" || easyPulseRemainingMs <= 0) {
+    return 0;
+  }
+
+  const elapsed = EASY_PULSE_DURATION_MS - easyPulseRemainingMs;
+  const progress = Math.max(0, Math.min(1, elapsed / EASY_PULSE_DURATION_MS));
+  const attackProgress = Math.max(0.001, Math.min(0.999, EASY_PULSE_ATTACK_RATIO));
+
+  let envelope = 0;
+  if (progress <= attackProgress) {
+    envelope = progress / attackProgress;
+  } else {
+    envelope = 1 - (progress - attackProgress) / (1 - attackProgress);
+  }
+
+  const easedEnvelope = Math.sin(Math.max(0, Math.min(1, envelope)) * (Math.PI / 2));
+  return EASY_PULSE_BLACK_ALPHA * easedEnvelope;
+}
+
+function getTransientDarkOverlayAlpha(view: PresentationView): number {
+  return Math.max(getRevealOverlayAlpha(view), getEasyModeOverlayAlpha());
 }
 
 function hashToUnit(seed: number, x: number, y: number): number {
@@ -479,25 +562,25 @@ function drawBoardGrid(): void {
 function drawFrame(view: PresentationView): void {
   const originX = FRAME_X + view.shakeOffset.x;
   const originY = FRAME_Y + view.shakeOffset.y;
-  const revealAlpha = getRevealOverlayAlpha(view);
+  const transientDarkAlpha = getTransientDarkOverlayAlpha(view);
   context.drawImage(theme.frameSurface, originX, originY);
 
-  if (revealAlpha > 0) {
-    drawRevealOverlayRect(originX, originY, FRAME_OUTER_WIDTH, FRAME_THICKNESS, revealAlpha);
+  if (transientDarkAlpha > 0) {
+    drawRevealOverlayRect(originX, originY, FRAME_OUTER_WIDTH, FRAME_THICKNESS, transientDarkAlpha);
     drawRevealOverlayRect(
       originX,
       originY + FRAME_OUTER_HEIGHT - FRAME_THICKNESS,
       FRAME_OUTER_WIDTH,
       FRAME_THICKNESS,
-      revealAlpha,
+      transientDarkAlpha,
     );
-    drawRevealOverlayRect(originX, originY + FRAME_THICKNESS, FRAME_THICKNESS, BOARD_HEIGHT, revealAlpha);
+    drawRevealOverlayRect(originX, originY + FRAME_THICKNESS, FRAME_THICKNESS, BOARD_HEIGHT, transientDarkAlpha);
     drawRevealOverlayRect(
       originX + FRAME_OUTER_WIDTH - FRAME_THICKNESS,
       originY + FRAME_THICKNESS,
       FRAME_THICKNESS,
       BOARD_HEIGHT,
-      revealAlpha,
+      transientDarkAlpha,
     );
   }
 
@@ -529,7 +612,7 @@ function drawField(view: PresentationView): void {
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
   const revealGameOver = shouldRevealGameOver(view);
-  const revealAlpha = getRevealOverlayAlpha(view);
+  const transientDarkAlpha = getTransientDarkOverlayAlpha(view);
 
   for (let y = 1; y < view.field.length; y += 1) {
     for (let x = 0; x < view.field[y].length; x += 1) {
@@ -558,13 +641,13 @@ function drawField(view: PresentationView): void {
         );
       }
 
-      if (revealAlpha > 0) {
+      if (transientDarkAlpha > 0) {
         drawRevealOverlayRect(
           originX + x * CELL_SIZE,
           originY + (y - 1) * CELL_SIZE,
           CELL_SIZE,
           CELL_SIZE,
-          revealAlpha,
+          transientDarkAlpha,
         );
       }
     }
@@ -581,7 +664,7 @@ function drawActivePiece(view: PresentationView): void {
   const originY = BOARD_Y + view.shakeOffset.y;
   const quarterTurns = rotationToQuarterTurns(activePiece.rotation);
   const revealGameOver = shouldRevealGameOver(view);
-  const revealAlpha = getRevealOverlayAlpha(view);
+  const transientDarkAlpha = getTransientDarkOverlayAlpha(view);
 
   for (const cell of getCellsForPiece(activePiece)) {
     const y = activePiece.y + cell.y;
@@ -609,13 +692,13 @@ function drawActivePiece(view: PresentationView): void {
       );
     }
 
-    if (revealAlpha > 0) {
+    if (transientDarkAlpha > 0) {
       drawRevealOverlayRect(
         originX + (activePiece.x + cell.x + view.activePieceOffset.x) * CELL_SIZE,
         originY + (y - 1 + view.activePieceOffset.y) * CELL_SIZE,
         CELL_SIZE,
         CELL_SIZE,
-        revealAlpha,
+        transientDarkAlpha,
       );
     }
   }
@@ -628,7 +711,7 @@ function drawLineClearRows(view: PresentationView): void {
 
   const originX = BOARD_X + view.shakeOffset.x;
   const originY = BOARD_Y + view.shakeOffset.y;
-  const revealAlpha = getRevealOverlayAlpha(view);
+  const transientDarkAlpha = getTransientDarkOverlayAlpha(view);
 
   for (const row of view.lineClearRows) {
     if (row.y < 1) {
@@ -645,13 +728,13 @@ function drawLineClearRows(view: PresentationView): void {
         cell.sourceCellY,
       );
 
-      if (revealAlpha > 0) {
+      if (transientDarkAlpha > 0) {
         drawRevealOverlayRect(
           originX + (cell.x + row.xOffsetCells) * CELL_SIZE,
           originY + (row.y - 1) * CELL_SIZE,
           CELL_SIZE,
           CELL_SIZE,
-          revealAlpha,
+          transientDarkAlpha,
         );
       }
     }
@@ -674,7 +757,7 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   const maxY = Math.max(...cells.map((cell) => cell.y));
   const offsetX = x + Math.floor((PREVIEW_BOX - (maxX + 1) * CELL_SIZE) / 2);
   const offsetY = y + Math.floor((PREVIEW_BOX - (maxY + 1) * CELL_SIZE) / 2);
-  const revealAlpha = getRevealOverlayAlpha(presentationState.view);
+  const transientDarkAlpha = getTransientDarkOverlayAlpha(presentationState.view);
 
   for (const cell of cells) {
     drawMaterialCell(
@@ -686,13 +769,13 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
       cell.y,
     );
 
-    if (revealAlpha > 0) {
+    if (transientDarkAlpha > 0) {
       drawRevealOverlayRect(
         offsetX + cell.x * CELL_SIZE,
         offsetY + cell.y * CELL_SIZE,
         CELL_SIZE,
         CELL_SIZE,
-        revealAlpha,
+        transientDarkAlpha,
       );
     }
   }
@@ -913,6 +996,18 @@ function loop(now: number): void {
         presentationState = triggerImpactShake(presentationState, state);
         audio.playImpact();
       }
+    }
+
+    if (!debugMode && activePublicRunMode === "easy" && state.phase !== "GameOver") {
+      easyPulseElapsedMs += FRAME_MS;
+      easyPulseRemainingMs = Math.max(0, easyPulseRemainingMs - FRAME_MS);
+      if (easyPulseElapsedMs >= EASY_PULSE_INTERVAL_MS) {
+        easyPulseElapsedMs -= EASY_PULSE_INTERVAL_MS;
+        easyPulseRemainingMs = EASY_PULSE_DURATION_MS;
+      }
+    } else {
+      easyPulseElapsedMs = 0;
+      easyPulseRemainingMs = 0;
     }
 
     if (pendingAutoRevealUse && state.phase !== "GameOver") {
