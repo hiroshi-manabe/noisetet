@@ -29,6 +29,7 @@ import {
   createBootSession,
   isDebugMode,
   resolveBootModeFromSources,
+  resolveBootSeed,
   type BootMode,
 } from "./mode.js";
 import {
@@ -78,6 +79,7 @@ const statsElement = document.querySelector<HTMLDivElement>("#stats");
 const statsCardElement = document.querySelector<HTMLElement>("#stats-card");
 const themeToggleControlElement = document.querySelector<HTMLElement>("#theme-toggle-control");
 const itemRevealControlElement = document.querySelector<HTMLElement>("#item-reveal-control");
+const startModeToggleElement = document.querySelector<HTMLButtonElement>("#start-mode-toggle");
 const soundToggleElement = document.querySelector<HTMLButtonElement>("#sound-toggle");
 const autoShakeToggleElement = document.querySelector<HTMLButtonElement>("#auto-shake-toggle");
 const revealAutoUseToggleElement = document.querySelector<HTMLButtonElement>("#reveal-auto-use-toggle");
@@ -94,6 +96,7 @@ if (
   statsCardElement === null ||
   themeToggleControlElement === null ||
   itemRevealControlElement === null ||
+  startModeToggleElement === null ||
   soundToggleElement === null ||
   autoShakeToggleElement === null ||
   revealAutoUseToggleElement === null
@@ -108,6 +111,7 @@ const stats: HTMLDivElement = statsElement;
 const statsCard: HTMLElement = statsCardElement;
 const themeToggleControl: HTMLElement = themeToggleControlElement;
 const itemRevealControl: HTMLElement = itemRevealControlElement;
+const startModeToggle: HTMLButtonElement = startModeToggleElement;
 const soundToggle: HTMLButtonElement = soundToggleElement;
 const autoShakeToggle: HTMLButtonElement = autoShakeToggleElement;
 const revealAutoUseToggle: HTMLButtonElement = revealAutoUseToggleElement;
@@ -172,6 +176,7 @@ let pendingAutoRevealUse = false;
 let state = bootSession.state;
 let presentationState: PresentationState = createPresentationState(state);
 let isPaused = bootSession.paused;
+let publicStartMode: "normal" | "gravity-max" = "normal";
 let elapsedGameplayMs = 0;
 let accumulator = 0;
 let previousTime = performance.now();
@@ -186,6 +191,11 @@ if (!debugMode) {
 function applyTheme(nextThemeName: AppTheme["name"]): void {
   themeName = nextThemeName;
   theme = createTheme(themeName, themeDimensions);
+}
+
+function createRunStateForPublicStartMode(startMode: "normal" | "gravity-max"): ReturnType<typeof createBootSession>["state"] {
+  const seed = resolveBootSeed("normal");
+  return createBootSession(startMode === "gravity-max" ? "debug20g" : "normal", seed).state;
 }
 
 function readSoundEnabled(): boolean {
@@ -227,6 +237,11 @@ function writeAutoShakeEnabled(enabled: boolean): void {
 
 function renderAutoShakeToggle(): void {
   autoShakeToggle.innerHTML = `<strong>AUTO SHAKE</strong> ${autoShakeEnabled ? "ON" : "OFF"}`;
+}
+
+function renderStartModeToggle(): void {
+  startModeToggle.innerHTML = `<strong>MODE</strong> ${publicStartMode === "gravity-max" ? "MAX" : "NORMAL"}`;
+  startModeToggle.disabled = state.pieceCount > 0 && state.phase !== "GameOver";
 }
 
 function readRevealAutoUseEnabled(): boolean {
@@ -286,7 +301,9 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (state.phase === "GameOver" && event.code === "KeyR") {
-    state = createBootSession(bootSession.mode).state;
+    state = debugMode
+      ? createBootSession(bootSession.mode).state
+      : createRunStateForPublicStartMode(publicStartMode);
     presentationState = createPresentationState(state);
     isPaused = false;
     elapsedGameplayMs = 0;
@@ -303,6 +320,15 @@ window.addEventListener("keyup", (event) => {
 
 window.addEventListener("pointerdown", () => {
   audio.unlock();
+});
+
+startModeToggle.addEventListener("click", () => {
+  if (debugMode || (state.pieceCount > 0 && state.phase !== "GameOver")) {
+    return;
+  }
+
+  publicStartMode = publicStartMode === "normal" ? "gravity-max" : "normal";
+  renderStartModeToggle();
 });
 
 soundToggle.addEventListener("click", () => {
@@ -808,6 +834,7 @@ function renderStats(view: PresentationView, paused: boolean, elapsedMs: number)
     ["Phase", view.phase],
     ["Score", String(view.score)],
     ["Pieces", String(view.pieceCount)],
+    ["StartMode", debugMode ? bootSession.mode : publicStartMode],
     ["Gravity", String(view.gravityInternal)],
     ["RevealAuto", revealAutoUseEnabled ? "on" : "off"],
     ["RevealGauge", `${view.revealChargeProgress}/${REVEAL_ITEM_PIECES_PER_CHARGE}`],
@@ -912,10 +939,12 @@ function loop(now: number): void {
     accumulator -= FRAME_MS;
   }
 
+  renderStartModeToggle();
   render(presentationState.view);
   requestAnimationFrame(loop);
 }
 
+renderStartModeToggle();
 renderSoundToggle();
 renderAutoShakeToggle();
 renderRevealControls();

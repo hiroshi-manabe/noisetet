@@ -695,6 +695,7 @@ User-facing HUD:
 - uses no debug-only state labels or internal counters
 - gameplay-state displays such as reveal gauge/item count belong in the in-canvas HUD rather than the sidebar
 - sidebar cards such as controls, sound, and assist remain outside-the-game preference or reference UI
+- the sidebar may also expose pre-run start options, but those options must lock once a run is in progress
 - in solid mode, the `NEXT` label may remain a simple helper label rather than a textured/noise-treated material role
 - in noise mode, the `NEXT` label should not be shown
 

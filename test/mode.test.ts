@@ -51,6 +51,15 @@ describe("boot modes", () => {
     expect(session.state.score).toBe(0);
   });
 
+  it("boots normal with standard conditions", () => {
+    const session = createBootSession("normal", 123);
+
+    expect(session.state.pieceCount).toBe(0);
+    expect(session.state.gravityInternal).toBeGreaterThan(0);
+    expect(session.state.gravityInternal).toBeLessThan(5120);
+    expect(session.paused).toBe(false);
+  });
+
   it("exports the Vite env key used for boot mode", () => {
     expect(BOOT_MODE_ENV_KEY).toBe("VITE_BOOT_MODE");
   });
