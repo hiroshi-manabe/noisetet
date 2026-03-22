@@ -741,7 +741,7 @@ function drawLineClearRows(view: PresentationView): void {
   }
 }
 
-function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
+function drawPreviewPiece(type: Tetromino, x: number, y: number, previewIndex: number, view: PresentationView): void {
   const previewPiece = {
     type,
     rotation: "spawn" as const,
@@ -757,7 +757,8 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
   const maxY = Math.max(...cells.map((cell) => cell.y));
   const offsetX = x + Math.floor((PREVIEW_BOX - (maxX + 1) * CELL_SIZE) / 2);
   const offsetY = y + Math.floor((PREVIEW_BOX - (maxY + 1) * CELL_SIZE) / 2);
-  const transientDarkAlpha = getTransientDarkOverlayAlpha(presentationState.view);
+  const transientDarkAlpha = getTransientDarkOverlayAlpha(view);
+  const revealGameOver = shouldRevealGameOver(view);
 
   for (const cell of cells) {
     drawMaterialCell(
@@ -776,6 +777,17 @@ function drawPreviewPiece(type: Tetromino, x: number, y: number): void {
         CELL_SIZE,
         CELL_SIZE,
         transientDarkAlpha,
+      );
+    }
+
+    if (revealGameOver) {
+      drawGameOverRevealDots(
+        offsetX + cell.x * CELL_SIZE,
+        offsetY + cell.y * CELL_SIZE,
+        CELL_SIZE,
+        CELL_SIZE,
+        4000 + previewIndex * 16 + cell.y * 4 + cell.x,
+        view.gameOverRevealProgress,
       );
     }
   }
@@ -811,7 +823,7 @@ function drawPreviews(view: PresentationView): void {
       context.strokeStyle = theme.previewBoxStroke;
       context.strokeRect(boxX + 0.5, boxY + 0.5, PREVIEW_BOX - 1, PREVIEW_BOX - 1);
     }
-    drawPreviewPiece(preview.type, pieceX, pieceY);
+    drawPreviewPiece(preview.type, pieceX, pieceY, preview.index, view);
   });
 }
 
