@@ -46,7 +46,6 @@ Useful development modes:
 
 ```sh
 npm run dev:debug
-npm run dev:debug20g
 npm run dev:noise
 ```
 
@@ -80,7 +79,7 @@ npm test
 
 ## Debug Notes
 
-- `debug` and `debug20g` boot modes start paused
+- `debug` boot mode starts paused
 - `V` toggles theme only in debug modes
 - normal mode always boots in the noise theme
 

@@ -26,7 +26,7 @@ describe("theme selection", () => {
 
   it("keeps theme overrides available in debug modes", () => {
     expect(resolveRuntimeTheme("debug", "solid", "noise")).toBe("solid");
-    expect(resolveRuntimeTheme("debug20g", undefined, "noise")).toBe("noise");
+    expect(resolveRuntimeTheme("debug", undefined, "noise")).toBe("noise");
   });
 
   it("accepts explicit theme names", () => {

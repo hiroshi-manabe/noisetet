@@ -172,7 +172,7 @@ Rules:
 - in shipped `normal` mode, the game should always boot into the `noise` theme regardless of debug theme overrides
 - hidden theme overrides exist for debug use, not for the normal player-facing boot path
 - theme selection must not alter gameplay state, randomization, or timings
-- in `debug` and `debug20g`, the active theme may be toggled live without resetting gameplay or presentation state
+- in `debug`, the active theme may be toggled live without resetting gameplay or presentation state
 - because debug modes can toggle theme at runtime, no additional combined startup modes are required
 
 ---
@@ -367,28 +367,25 @@ This behavior is important for two reasons:
 
 #### 9.3 Application boot modes
 
-The application should support three boot modes:
+The application should support two boot modes:
 
 - `normal`
 - `debug`
-- `debug20g`
 
 Rules:
 
 - `normal` is the user-facing mode and starts unpaused
 - `debug` is non-user-facing and starts paused
-- `debug20g` is non-user-facing and starts paused
 - `normal` should seed the randomizer from a time-derived source rather than a fixed development seed
-- `debug` and `debug20g` should use a fixed deterministic seed by default so behavior stays reproducible during testing
+- `debug` should use a fixed deterministic seed by default so behavior stays reproducible during testing
 - after a game-over restart, the next run should start unpaused regardless of debug boot mode
-- `debug20g` should initialize directly into `20G` conditions with piece count set to `500`
 - no in-game mode transitions are required
 - debug modes should be entered only through a hidden startup mechanism rather than a visible menu
 
 Development boot mechanism:
 
 - the application may read a dev-only startup mode from the Vite environment via `VITE_BOOT_MODE`
-- the development scripts should include direct entry points for `debug` and `debug20g`
+- the development scripts should include a direct entry point for `debug`
 - a hidden persisted storage override may still exist as a fallback
 - if both environment and storage are present, the environment value takes precedence
 
@@ -934,7 +931,6 @@ Testing should happen at two levels.
 - line clear correctness
 - spawn blocking behavior
 - piece-count-based gravity progression
-- debug20g boot behavior
 - `20G` input behavior with IRS, DAS preload, and active-phase manipulation
 
 #### 20.2 Presentation tests

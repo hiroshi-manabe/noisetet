@@ -1,4 +1,5 @@
 import {
+  createInitialGameState,
   FIELD_HEIGHT,
   FIELD_WIDTH,
   getCellsForPiece,
@@ -174,7 +175,11 @@ function readTheme(): AppTheme["name"] {
 
 function createRunStateForPublicStartMode(startMode: PublicStartMode): ReturnType<typeof createBootSession>["state"] {
   const seed = resolveBootSeed("normal");
-  return createBootSession(startMode === "gravity-max" ? "debug20g" : "normal", seed).state;
+  if (startMode === "gravity-max") {
+    return createInitialGameState({ seed, pieceCount: 500 });
+  }
+
+  return createBootSession("normal", seed).state;
 }
 
 function readPublicStartMode(): PublicStartMode {

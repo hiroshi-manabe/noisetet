@@ -3,7 +3,7 @@ import { createInitialGameState, type GameState } from "../core/index.js";
 export const BOOT_MODE_STORAGE_KEY = "noisetet:mode";
 export const BOOT_MODE_ENV_KEY = "VITE_BOOT_MODE";
 
-export type BootMode = "normal" | "debug" | "debug20g";
+export type BootMode = "normal" | "debug";
 
 export interface BootSession {
   mode: BootMode;
@@ -12,7 +12,7 @@ export interface BootSession {
 }
 
 function parseBootMode(rawValue: string | null | undefined): BootMode | null {
-  if (rawValue === "normal" || rawValue === "debug" || rawValue === "debug20g") {
+  if (rawValue === "normal" || rawValue === "debug") {
     return rawValue;
   }
 
@@ -49,12 +49,6 @@ export function createBootSession(mode: BootMode, seed = resolveBootSeed(mode)):
         mode,
         paused: true,
         state: createInitialGameState({ seed }),
-      };
-    case "debug20g":
-      return {
-        mode,
-        paused: true,
-        state: createInitialGameState({ seed, pieceCount: 500 }),
       };
     case "normal":
     default:

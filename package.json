@@ -8,7 +8,6 @@
   "scripts": {
     "dev": "vite",
     "dev:debug": "vite --mode debug",
-    "dev:debug20g": "vite --mode debug20g",
     "dev:noise": "vite --mode noise",
     "build": "vite build",
     "preview": "vite preview",

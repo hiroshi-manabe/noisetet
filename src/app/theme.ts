@@ -77,7 +77,7 @@ export function resolveThemeFromSources(
 }
 
 export function resolveRuntimeTheme(
-  mode: "normal" | "debug" | "debug20g",
+  mode: "normal" | "debug",
   envValue: string | undefined,
   storageValue: string | null,
 ): ThemeName {
