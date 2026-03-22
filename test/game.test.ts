@@ -29,6 +29,14 @@ describe("game state", () => {
     expect(state.activePiece).toBeNull();
   });
 
+  it("can start in forced max gravity without faking the piece count", () => {
+    const state = createInitialGameState({ seed: 7, forceMaxGravity: true });
+
+    expect(state.forceMaxGravity).toBe(true);
+    expect(state.pieceCount).toBe(0);
+    expect(state.gravityInternal).toBe(5120);
+  });
+
   it("uses the tightened fixed handling timings", () => {
     expect(DEFAULT_TIMINGS.are).toBe(16);
     expect(DEFAULT_TIMINGS.lineAre).toBe(12);
@@ -89,6 +97,27 @@ describe("game state", () => {
     expect(state.activePiece).toBeNull();
     expect(state.pieceCount).toBe(1);
     expect(state.score).toBe(0);
+  });
+
+  it("keeps forced max gravity after locking pieces", () => {
+    let state = createInitialGameState({ seed: 7, forceMaxGravity: true });
+
+    for (let frame = 0; frame < state.config.timings.are + 1; frame += 1) {
+      state = stepGame(state);
+    }
+
+    state = stepGame(state, {
+      left: false,
+      right: false,
+      rotateCW: false,
+      rotateCCW: false,
+      up: true,
+      down: false,
+    });
+
+    expect(state.forceMaxGravity).toBe(true);
+    expect(state.pieceCount).toBe(1);
+    expect(state.gravityInternal).toBe(5120);
   });
 
   it("enters LineClear and collapses the field after the delay", () => {

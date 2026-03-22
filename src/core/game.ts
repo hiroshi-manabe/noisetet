@@ -58,7 +58,11 @@ function cloneField(field: Field): Field {
   return field.map((row) => [...row]);
 }
 
-function resolveGravityInternal(pieceCount: number, config: GameConfig): number {
+function resolveGravityInternal(pieceCount: number, config: GameConfig, forceMaxGravity = false): number {
+  if (forceMaxGravity) {
+    return config.gravity20GInternal;
+  }
+
   if (pieceCount >= config.gravity20GPieceCount) {
     return config.gravity20GInternal;
   }
@@ -77,6 +81,7 @@ export function createInitialGameState(options?: {
   seed?: number;
   config?: GameConfig;
   field?: Field;
+  forceMaxGravity?: boolean;
   pieceCount?: number;
   score?: number;
 }): GameState {
@@ -84,6 +89,7 @@ export function createInitialGameState(options?: {
   const initialField = options?.field ? cloneField(options.field) : createEmptyField(config.fieldWidth, config.fieldHeight);
   const randomizer = createRandomizerState(options?.seed ?? 1);
   const queueFill = fillQueue(randomizer, config.queueLength);
+  const forceMaxGravity = options?.forceMaxGravity ?? false;
   const pieceCount = options?.pieceCount ?? 0;
   const score = options?.score ?? 0;
 
@@ -93,12 +99,13 @@ export function createInitialGameState(options?: {
     queue: queueFill.pieces,
     randomizer: queueFill.state,
     activePiece: null,
+    forceMaxGravity,
     pieceCount,
     score,
     manualShakeUsedSinceLastClear: false,
     revealCharges: 0,
     piecesTowardNextRevealCharge: 0,
-    gravityInternal: resolveGravityInternal(pieceCount, config),
+    gravityInternal: resolveGravityInternal(pieceCount, config, forceMaxGravity),
     inputMemory: createInputMemory(),
     areFramesRemaining: config.timings.are,
     lineClearFramesRemaining: 0,
@@ -110,8 +117,9 @@ export function createInitialGameState(options?: {
 export function getGravityInternalForPieceCount(
   pieceCount: number,
   config = DEFAULT_CONFIG,
+  forceMaxGravity = false,
 ): number {
-  return resolveGravityInternal(pieceCount, config);
+  return resolveGravityInternal(pieceCount, config, forceMaxGravity);
 }
 
 function updateInputMemory(state: GameState, input: InputFrame): InputMemory {
@@ -491,7 +499,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
       manualShakeUsedSinceLastClear: false,
       revealCharges: revealProgress.revealCharges,
       piecesTowardNextRevealCharge: revealProgress.piecesTowardNextRevealCharge,
-      gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
+      gravityInternal: resolveGravityInternal(nextPieceCount, state.config, state.forceMaxGravity),
       lineClearFramesRemaining: state.config.timings.lineClearDelay,
       pendingClearedRows,
     };
@@ -507,7 +515,7 @@ function lockCurrentPiece(state: GameState, piece: ActivePiece): GameState {
     manualShakeUsedSinceLastClear: state.manualShakeUsedSinceLastClear,
     revealCharges: revealProgress.revealCharges,
     piecesTowardNextRevealCharge: revealProgress.piecesTowardNextRevealCharge,
-    gravityInternal: resolveGravityInternal(nextPieceCount, state.config),
+    gravityInternal: resolveGravityInternal(nextPieceCount, state.config, state.forceMaxGravity),
     areFramesRemaining: state.config.timings.are,
     pendingClearedRows: [],
     lineClearFramesRemaining: 0,

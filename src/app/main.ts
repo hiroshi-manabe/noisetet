@@ -173,13 +173,15 @@ function readTheme(): AppTheme["name"] {
   }
 }
 
-function createRunStateForPublicStartMode(startMode: PublicStartMode): ReturnType<typeof createBootSession>["state"] {
-  const seed = resolveBootSeed("normal");
+function createRunStateForPublicStartMode(
+  startMode: PublicStartMode,
+  seed = resolveBootSeed("normal"),
+): ReturnType<typeof createBootSession>["state"] {
   if (startMode === "gravity-max") {
-    return createInitialGameState({ seed, pieceCount: 500 });
+    return createInitialGameState({ seed, forceMaxGravity: true });
   }
 
-  return createBootSession("normal", seed).state;
+  return createInitialGameState({ seed });
 }
 
 function readPublicStartMode(): PublicStartMode {
@@ -205,7 +207,8 @@ function writePublicStartMode(mode: PublicStartMode): void {
 
 const bootSession = createBootSession(readBootMode());
 const debugMode = isDebugMode(bootSession.mode);
-const initialPublicStartMode: PublicStartMode = debugMode ? "normal" : readPublicStartMode();
+const initialPublicStartMode: PublicStartMode = readPublicStartMode();
+const runSeed = resolveBootSeed(bootSession.mode);
 let themeName: AppTheme["name"] = readTheme();
 let theme = createTheme(themeName, themeDimensions);
 const audio = createGameAudio();
@@ -215,7 +218,7 @@ let autoShakeEnabled = readAutoShakeEnabled();
 let revealAutoUseEnabled = readRevealAutoUseEnabled();
 let pendingAutoRevealUse = false;
 
-let state = debugMode ? bootSession.state : createRunStateForPublicStartMode(initialPublicStartMode);
+let state = createRunStateForPublicStartMode(initialPublicStartMode, runSeed);
 let presentationState: PresentationState = createPresentationState(state);
 let isPaused = bootSession.paused;
 let publicStartMode: PublicStartMode = initialPublicStartMode;
@@ -231,8 +234,6 @@ if (!debugMode) {
   statsCard.style.display = "none";
   themeToggleControl.style.display = "none";
   shell.style.width = "min(1040px, calc(100vw - 16px))";
-} else {
-  startCard.style.display = "none";
 }
 
 function applyTheme(nextThemeName: AppTheme["name"]): void {
@@ -241,7 +242,7 @@ function applyTheme(nextThemeName: AppTheme["name"]): void {
 }
 
 function isStartModeSelectable(): boolean {
-  return !debugMode;
+  return true;
 }
 
 function getNextPublicStartMode(mode: PublicStartMode): PublicStartMode {
@@ -362,9 +363,7 @@ window.addEventListener("keydown", (event) => {
 
   if (state.phase === "GameOver" && event.code === "KeyR") {
     activePublicRunMode = publicStartMode;
-    state = debugMode
-      ? createBootSession(bootSession.mode).state
-      : createRunStateForPublicStartMode(publicStartMode);
+    state = createRunStateForPublicStartMode(publicStartMode, runSeed);
     presentationState = createPresentationState(state);
     isPaused = false;
     elapsedGameplayMs = 0;

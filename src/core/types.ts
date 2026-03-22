@@ -73,6 +73,7 @@ export interface GameState {
   queue: Tetromino[];
   randomizer: RandomizerState;
   activePiece: ActivePiece | null;
+  forceMaxGravity: boolean;
   pieceCount: number;
   score: number;
   manualShakeUsedSinceLastClear: boolean;

@@ -582,6 +582,12 @@ For `pieceCount >= 500`:
 
 This curve is intentionally smooth and monotonic while still reaching a strong pre-20G pace before the final jump to 20G.
 
+If a public `MAX` start mode is exposed, it should force `20G` from run start without falsifying the piece counter. In that mode:
+
+- `pieceCount` should still start at `0`
+- `pieceCount` should still increment by actual locked pieces
+- the forced `20G` condition should come from an explicit rule flag, not from seeding the run at `pieceCount = 500`
+
 Useful checkpoints:
 
 | Locked pieces | Approx gravity |
